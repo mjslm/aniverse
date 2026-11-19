@@ -2,6 +2,9 @@
 
 AniVerse is a mobile-friendly anime catalog and watchlist web app. It uses React for rendering, Tailwind CSS and custom styles for the interface, and Supabase for authentication and saved account data.
 
+- [Live AniVerse website](https://aniverse-slmn.vercel.app/)
+- [GitHub repository](https://github.com/mjslm/aniverse)
+
 ## Run locally
 
 1. Install **Node.js 22 or newer**.
@@ -21,8 +24,9 @@ Use `npm` instead of `npm.cmd` on macOS and Linux. Open [http://localhost:3000](
 1. As a guest, search for **demon**, open **Demon Slayer**, and try the title preview.
 2. Confirm that guests can browse the catalog and that membership options are hidden.
 3. Create an account or log in. If email confirmation is enabled, open the confirmation link in the same browser.
-4. Save an anime to the Watchlist. In Profile, choose a membership plan to see how the app stores VIP status. Membership activation is free. The payment choices are display controls.
-5. To check the video API, open [http://localhost:3000/api/health](http://localhost:3000/api/health) and look for `"ok": true`.
+4. Save an anime and check that it appears in the Watchlist.
+5. Sign in with an account without active VIP. The Premium upgrade card should appear on Home. Choose a plan and subscribe, then return to Home. The card should disappear and Profile should show active VIP. Membership activation is free. The payment choices are display controls.
+6. To check the video API, open [http://localhost:3000/api/health](http://localhost:3000/api/health) and look for `"ok": true`.
 
 The catalog includes official title previews. Playback and offline downloads for an episode depend on its configured video source.
 
@@ -74,14 +78,23 @@ http://localhost:3000/?auth=recovery
 
 ## Deploy to Vercel
 
-Import the GitHub repository into Vercel with the following settings.
+AniVerse is deployed at [aniverse-slmn.vercel.app](https://aniverse-slmn.vercel.app/). To deploy another copy, import the GitHub repository into Vercel with these settings.
 
 | Setting | Value |
 | --- | --- |
-| Framework Preset | Other |
-| Root Directory | Folder containing `package.json` and `vercel.json` |
+| Application Preset | Other |
+| Root Directory | `./` |
 | Install Command | `npm ci --include=dev` |
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
-The public configuration in `app.config.json` works by default. For a separate Supabase project, set the same two environment variables in Vercel. After deployment, set Supabase’s Site URL to the production URL and add that domain with `/?auth=confirmed` and `/?auth=recovery` to the redirect list. Keep the localhost entries for local testing.
+The public configuration in `app.config.json` works by default. For a separate Supabase project, set the same two environment variables in Vercel.
+
+For the live site, use `https://aniverse-slmn.vercel.app` as the Supabase **Site URL** and allow these redirects:
+
+```text
+https://aniverse-slmn.vercel.app/?auth=confirmed
+https://aniverse-slmn.vercel.app/?auth=recovery
+```
+
+Keep the localhost redirects for local testing. Pushes to `main` trigger a Vercel deployment while the GitHub integration is connected. The live site updates after a successful build.
