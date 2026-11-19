@@ -1,0 +1,15 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+.row {
+  @apply flex items-center gap-2;
+}
+.between {
+  @apply justify-between;
+}
+.grow {
+  @apply flex-1 min-w-0;
+}
+.stack {
+  @apply grid gap-3;
+}

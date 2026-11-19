@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.vercel/
+.openai/
+*.log
+
+dist/tailwind.css
+dist/vendor/react-ui.js*
