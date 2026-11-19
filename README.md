@@ -60,9 +60,9 @@ The build generates `dist/tailwind.css` and `dist/vendor/react-ui.js`. Edit the 
 
 ## Supabase setup
 
-The submission includes public connection settings in `app.config.json`. Use the existing project for review as long as it’s available. Its database is already set up.
+A fresh clone needs the Supabase project URL and publishable key. Ask the project owner for the review project’s public settings or use your own Supabase project. A local `app.config.json` also works for an existing installation.
 
-To run against a separate, empty Supabase project, run `supabase/schema.sql` once, then the files in `supabase/migrations/` in filename order. Copy `.env.example` to `.env` and fill in both values:
+For a separate, empty Supabase project, run `supabase/schema.sql` once, then the files in `supabase/migrations/` in filename order. For local setup, copy `.env.example` to `.env` and fill in both values:
 
 ```dotenv
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
@@ -88,7 +88,7 @@ AniVerse is deployed at [aniverse-slmn.vercel.app](https://aniverse-slmn.vercel.
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
-The public configuration in `app.config.json` works by default. For a separate Supabase project, set the same two environment variables in Vercel.
+In Vercel, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` under **Settings → Environment Variables** for Production. Add them to Preview too if you deploy preview builds.
 
 For the live site, use `https://aniverse-slmn.vercel.app` as the Supabase **Site URL** and allow these redirects:
 

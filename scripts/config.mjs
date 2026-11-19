@@ -13,10 +13,9 @@ function readEnv(file) {
 }
 
 export function resolveConfig(root, environment = process.env) {
-  const defaults = JSON.parse(fs.readFileSync(path.join(root, 'app.config.json'), 'utf8')).supabase;
   const local = readEnv(path.join(root, '.env'));
-  let config = defaults;
-  let source = 'app.config.json';
+  let config;
+  let source;
 
   // Never combine credentials from two different projects.
   for (const [values, label] of [[local, '.env'], [environment, 'environment']]) {
@@ -26,6 +25,14 @@ export function resolveConfig(root, environment = process.env) {
     }
     config = { url: values.SUPABASE_URL, publishableKey: values.SUPABASE_PUBLISHABLE_KEY };
     source = label;
+  }
+  if (!config) {
+    const configFile = path.join(root, 'app.config.json');
+    if (!fs.existsSync(configFile)) {
+      throw new Error('Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in the environment or .env, or provide a local app.config.json.');
+    }
+    config = JSON.parse(fs.readFileSync(configFile, 'utf8')).supabase;
+    source = 'app.config.json';
   }
   if (!validPublicConfig(config)) {
     throw new Error(`Invalid public account settings in ${source}. Use a project URL and publishable key; never a secret key.`);

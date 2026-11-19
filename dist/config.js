@@ -1,1 +1,0 @@
-export const supabaseConfig = {"url":"https://rnxugkmsobyaddbmkkpw.supabase.co","publishableKey":"sb_publishable_Dqs-x1icBMDhYU6N0f19WA_BKBydQci"};

@@ -14,12 +14,12 @@ test('local preview uses the shipped client when esbuild is missing and builds e
       fs.mkdirSync(path.join(fixture, folder), { recursive: true });
     }
     fs.writeFileSync(path.join(fixture, 'package.json'), '{"type":"module"}');
-    for (const file of ['scripts/build-auth.mjs', 'dist/modules/auth.js', 'scripts/config.mjs', 'app.config.json']) {
+    for (const file of ['scripts/build-auth.mjs', 'dist/modules/auth.js', 'scripts/config.mjs']) {
       fs.copyFileSync(path.join(root, file), path.join(fixture, file));
     }
     fs.writeFileSync(path.join(fixture, 'dist/vendor/supabase.js'), 'export {};');
     const command = path.join(fixture, 'scripts/build-auth.mjs');
-    const options = { encoding: 'utf8', env: { ...process.env, SUPABASE_URL: '', SUPABASE_PUBLISHABLE_KEY: '' } };
+    const options = { encoding: 'utf8', env: { ...process.env, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_example_public_key_123456789' } };
     const preview = spawnSync(process.execPath, [command], options);
     assert.equal(preview.status, 0, preview.stderr);
     assert.match(preview.stdout, /Using the included account client/);

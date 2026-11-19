@@ -8,3 +8,6 @@ node_modules/
 
 dist/tailwind.css
 dist/vendor/react-ui.js*
+
+/app.config.json
+/dist/config.js

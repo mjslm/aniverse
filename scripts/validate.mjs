@@ -49,7 +49,6 @@ for (const file of ["dist/config.js", "dist/bootstrap.js", "dist/modules/local-p
   const result = spawnSync(process.execPath, ["--check", path.join(root, file)], { encoding: "utf8" });
   if (result.status !== 0) errors.push(result.stderr);
 }
-JSON.parse(fs.readFileSync(path.join(root, "app.config.json"), "utf8"));
 JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
 JSON.parse(fs.readFileSync(path.join(root, "dist/manifest.webmanifest"), "utf8"));
 if (errors.length) {

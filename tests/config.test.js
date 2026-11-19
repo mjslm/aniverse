@@ -28,3 +28,13 @@ test('complete environment settings take priority and partial overrides are reje
   assert.throws(() => resolveConfig(root, { SUPABASE_URL: other.SUPABASE_URL }), /Set both/);
   assert.throws(() => resolveConfig(root, { ...other, SUPABASE_PUBLISHABLE_KEY: 'sb_secret_not_for_browsers' }), /never a secret key/);
 }));
+
+test('a Git checkout without app.config.json can build with Vercel environment variables', () => fixture(root => {
+  fs.unlinkSync(path.join(root, 'app.config.json'));
+  assert.throws(() => resolveConfig(root, {}), /Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY/);
+  assert.equal(prepareConfig(root, {
+    SUPABASE_URL: defaults.url,
+    SUPABASE_PUBLISHABLE_KEY: defaults.publishableKey,
+  }).source, 'environment');
+  assert.match(fs.readFileSync(path.join(root, 'dist/config.js'), 'utf8'), /https:\/\/example.supabase.co/);
+}));
