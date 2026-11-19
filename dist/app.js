@@ -203,7 +203,7 @@ function homePoster(id, seasonal = false) {
   return `<a class="poster-card" href="#detail/${id}"><div class="poster">${crop(file, a.title, style, base)}${rating(a.rating)}<span class="pill episode-label">${a.episodes} EPS</span>${id === "jjk" ? '<div class="progress"><i></i></div>' : ""}</div><div class="poster-info"><h3 class="ellipsis">${esc(id === "frieren" ? "Frieren: Beyond Journey" : a.short)}</h3><p class="muted ellipsis">${esc(id === "jjk" ? "Supernatural • Action" : id === "oshi" ? "Mystery • Drama" : id === "kaiju" ? "Sci-Fi • Shonen" : id === "frieren" ? "Drama • Fantasy" : a.genre)}</p></div></a>`;
 }
 function home() {
-  return `${header("", "HOME")}<main class="home-page"><form class="search-pill" id="home-search" role="search"><button type="submit" aria-label="Search anime">${icon("bf859.svg")}</button><input class="placeholder" type="search" name="query" placeholder="Search anime, genres, studios..." maxlength="200" aria-label="Search anime"><button type="button" class="filter-bubble" data-action="filters" aria-label="Filter and sort">${icon("2aa1d.svg")}</button></form><section class="hero"><div class="hero-art"><img src="${A("8fba8.png")}" alt="Attack on Titan battlefield"></div><div class="hero-content"><div class="badge-row"><span class="pill hot">FEATURED SPOTLIGHT</span><span class="pill peach">SIMULCAST PREMIERE</span></div><a href="#detail/aot"><h1>Attack on Titan: The Final<br>Season</h1></a><div class="badge-row">${rating("9.1", "2dfc5.svg")}<span class="pill">Action</span><span class="pill">Dark Fantasy</span><span class="pill cyan">Sub | Dub</span></div><p class="hero-synopsis muted clamp">The war for Paradis zeroes in on Shiganshina as Jaegerists take control. The ultimate clash between Eren and the…</p><div class="actions"><a class="btn primary" href="#player/aot/29">${icon("32ab0.svg")}Watch Now</a><button class="btn secondary" data-action="save" data-id="aot">${icon("78b0c.svg")}My List</button></div></div></section><section class="home-section"><div class="section-title"><h2 class="accent-title">Trending Now</h2><a class="text-button" href="#browse">See All${icon("f9bf5.svg")}</a></div><div class="carousel">${["jjk", "demon", "chainsaw"].map((id) => homePoster(id)).join("")}</div></section><section class="home-section"><div class="section-title"><h2 class="accent-title cool">Top Seasonal Anime</h2><button class="text-button cyan" data-action="seasonal">Top Rated${icon("6bab5.svg")}</button></div><div class="carousel">${["frieren", "kaiju", "oshi"].map((id) => homePoster(id, true)).join("")}</div></section>${canAccessMembership() ? `<section class="premium-banner"><div class="row"><span class="premium-icon">${icon('36720.svg')}</span><div><div class="eyebrow">MEMBERSHIP PASS</div><h2>Upgrade to AniVerse Premium</h2></div></div><p>Stream ad-free anime, catch new simulcasts 1 hour after Japan, enjoy crisp 4K HDR playback, and download episodes for offline viewing.</p><div class="perks"><span>${icon('163ef.svg')}No Ads</span><span>${icon('ea915.svg')}Simulcasts</span><span>${icon('d8320.svg')}Offline</span></div><a class="btn primary full" href="#checkout">Go Premium${icon('616d6.svg')}</a></section>` : ""}</main>${nav("home")}`;
+  return `${header("", "HOME")}<main class="home-page"><form class="search-pill" id="home-search" role="search"><button type="submit" aria-label="Search anime">${icon("bf859.svg")}</button><input class="placeholder" type="search" name="query" placeholder="Search anime, genres, studios..." maxlength="200" aria-label="Search anime"><button type="button" class="filter-bubble" data-action="filters" aria-label="Filter and sort">${icon("2aa1d.svg")}</button></form><section class="hero"><div class="hero-art"><img src="${A("8fba8.png")}" alt="Attack on Titan battlefield"></div><div class="hero-content"><div class="badge-row"><span class="pill hot">FEATURED SPOTLIGHT</span><span class="pill peach">SIMULCAST PREMIERE</span></div><a href="#detail/aot"><h1>Attack on Titan: The Final<br>Season</h1></a><div class="badge-row">${rating("9.1", "2dfc5.svg")}<span class="pill">Action</span><span class="pill">Dark Fantasy</span><span class="pill cyan">Sub | Dub</span></div><p class="hero-synopsis muted clamp">The war for Paradis zeroes in on Shiganshina as Jaegerists take control. The ultimate clash between Eren and the…</p><div class="actions"><a class="btn primary" href="#player/aot/29">${icon("32ab0.svg")}Watch Now</a><button class="btn secondary" data-action="save" data-id="aot">${icon("78b0c.svg")}My List</button></div></div></section><section class="home-section"><div class="section-title"><h2 class="accent-title">Trending Now</h2><a class="text-button" href="#browse">See All${icon("f9bf5.svg")}</a></div><div class="carousel">${["jjk", "demon", "chainsaw"].map((id) => homePoster(id)).join("")}</div></section><section class="home-section"><div class="section-title"><h2 class="accent-title cool">Top Seasonal Anime</h2><button class="text-button cyan" data-action="seasonal">Top Rated${icon("6bab5.svg")}</button></div><div class="carousel">${["frieren", "kaiju", "oshi"].map((id) => homePoster(id, true)).join("")}</div></section>${shouldShowPremiumUpgrade() ? `<section class="premium-banner"><div class="row"><span class="premium-icon">${icon('36720.svg')}</span><div><div class="eyebrow">MEMBERSHIP PASS</div><h2>Upgrade to AniVerse Premium</h2></div></div><p>Stream ad-free anime, catch new simulcasts 1 hour after Japan, enjoy crisp 4K HDR playback, and download episodes for offline viewing.</p><div class="perks"><span>${icon('163ef.svg')}No Ads</span><span>${icon('ea915.svg')}Simulcasts</span><span>${icon('d8320.svg')}Offline</span></div><a class="btn primary full" href="#checkout">Go Premium${icon('616d6.svg')}</a></section>` : ""}</main>${nav("home")}`;
 }
 function posterSpec(a, scope) {
   const maps = { browse: { frieren: ["ee8b0.png", "left:-4px;top:-6px;width:calc(100% + 10px);height:calc(100% + 14.5px)", "54ab7.png"], aot: ["875f7.png", "top:3px;left:0;width:calc(100% + 9px);height:auto;aspect-ratio:849/1200"], bleach: ["7dc71.png", "left:-5px;top:0;width:calc(100% + 11px);height:auto;aspect-ratio:736/1040"], jjk: ["8c4f3.png", "left:-15px;top:0;width:calc(100% + 30px);height:calc(100% + 27.5px)", "6a89c.png"], dandadan: ["b8d7d.png", "height:calc(100% + .5px)", "bfc9b.png"], demon: ["12b05.png", "left:-14px;top:-21px;width:calc(100% + 44px);height:calc(100% + 66.5px)", "b6ab5.png"], chainsaw: ["53227.png", "left:-5px;width:calc(100% + 11px);height:calc(100% + .5px)", "014cb.png"], solo: ["2a9eb.png", "left:-9px;top:-14px;width:calc(100% + 18px);height:calc(100% + 26.5px)", "dddc4.png"], kaiju: ["96d3b.png", "left:-8px;top:-14px;width:calc(100% + 19px);height:auto;aspect-ratio:742/1050"] }, watch: { frieren: ["ee8b0.png", "top:-18px;left:0;width:calc(100% + 12px);height:calc(100% + 18.5px)", "00490.png"], kaiju: ["097ca.png", "top:-5px;left:-12px;width:calc(100% + 16px);height:calc(100% + 5.5px)", "4a810.png"], solo: ["2a9eb.png", "left:0;top:-17.5px;width:calc(100% + 12px);height:calc(100% + 17.5px)", "d9a50.png"], chainsaw: ["53227.png", "left:-3px;top:-7.5px;width:calc(100% + 7px);height:calc(100% + 7.5px)", "fbf3a.png"] } };
@@ -213,9 +213,14 @@ function catalogCard(a) {
   const [file, style, base] = posterSpec(a, "browse");
   return `<article class="catalog-card"><a href="#detail/${a.id}"><div class="poster">${crop(file, a.title, style, base)}${rating(a.rating, "323d0.svg")}<div class="studio"><span>${esc(a.studio)}</span><span>Ep ${a.episodes}</span></div></div><div class="catalog-info"><h3>${esc(a.title)}</h3><p class="ellipsis">${esc(a.genre)}</p><div class="status"><span>${esc(a.status)}</span>${icon("ba8c5.svg")}</div></div></a><button class="bookmark" data-action="toggle-save" data-id="${a.id}" aria-label="${library[a.id] ? "Remove" : "Add"} ${esc(a.short)} ${library[a.id] ? "from" : "to"} watchlist" aria-pressed="${!!library[a.id]}">${icon(library[a.id] ? "1a1f6.svg" : "2522e.svg")}</button></article>`;
 }
-let vip = null, vipUntil = null, membershipBusy = false, membershipError = "", membershipRead = 0;
+let vip = null, vipUntil = null, membershipBusy = false, membershipError = "", membershipRead = 0, membershipLoaded = false;
 const membershipDate = value => new Date(value).toLocaleDateString();
 const canAccessMembership = () => Boolean(authUser && !authUser.is_anonymous);
+function shouldShowPremiumUpgrade() {
+  const now = Date.now();
+  return canAccessMembership() && membershipLoaded
+    && !(Date.parse(vipUntil) > now || Date.parse(vip?.access_until) > now);
+}
 const isMembershipRoute = (page) => page === "checkout" || page === "confirmation";
 
 const planPrices = { Basic: 99, Standard: 179, Premium: 249 };
@@ -248,12 +253,18 @@ async function refreshMembership() {
       .gt("access_until", new Date().toISOString()).order("access_until", { ascending: false }).limit(1)
   ]);
   if (authUser?.id !== owner || generation !== membershipRead) return;
+  const showedUpgrade = shouldShowPremiumUpgrade();
   if (!demo.error) {
     vipUntil = demo.data?.expires_at || null;
     savedPlan = demo.data?.plan || "Standard";
   }
   if (!paid.error) vip = paid.data[0] || null;
-  if (["profile", "checkout", "confirmation"].includes(currentRoute().page)) render({ keepScroll: true });
+  if (!demo.error && !paid.error) membershipLoaded = true;
+  const page = currentRoute().page;
+  if (["profile", "checkout", "confirmation"].includes(page)
+    || (page === "home" && showedUpgrade !== shouldShowPremiumUpgrade())) {
+    render({ keepScroll: true });
+  }
 }
 
 async function subscribeMembership() {
@@ -271,6 +282,7 @@ async function subscribeMembership() {
     vipUntil = data;
     savedPlan = plan;
     if (currentRoute().page === "checkout") go("confirmation");
+    else if (currentRoute().page === "home") render({ keepScroll: true });
   } catch (error) {
     if (authUser?.id === owner) membershipError = error.message;
   } finally {
@@ -1843,6 +1855,7 @@ async function handleAuthChange(event, session) {
     clearTimeout(syncTimer);
     accountOwner = nextOwner;
     vip = vipUntil = null;
+    membershipLoaded = false;
     savedPlan = "Standard";
     membershipError = "";
     membershipBusy = false;
@@ -1868,7 +1881,7 @@ async function handleAuthChange(event, session) {
   }
   if (next && ["SIGNED_IN", "INITIAL_SESSION"].includes(event)) {
     syncCloud();
-    if (["profile", "checkout", "confirmation"].includes(currentRoute().page)) refreshMembership();
+    if (["home", "profile", "checkout", "confirmation"].includes(currentRoute().page)) refreshMembership();
   }
 }
 async function bootAuth() {
@@ -1940,7 +1953,7 @@ window.addEventListener("hashchange", () => {
   membershipError = "";
   restoreRouteState();
   render({ keepScroll });
-  if (["profile", "checkout", "confirmation"].includes(route.page)) refreshMembership();
+  if (["home", "profile", "checkout", "confirmation"].includes(route.page)) refreshMembership();
 });
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
