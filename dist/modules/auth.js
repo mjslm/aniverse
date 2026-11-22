@@ -48,15 +48,22 @@ export function createAuthService(config, { loadSDK = () => import("../vendor/su
     get recovery() {
       return recovery;
     },
-    async init() {
+    async init({ recoveryCode = null } = {}) {
       if (!ready) return null;
       const { createClient } = await loadSDK();
-      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" } });
+      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !recoveryCode, flowType: "pkce" } });
       client.auth.onAuthStateChange((event, session) => {
-        if (event === "PASSWORD_RECOVERY") recovery = true;
+        if (event === "PASSWORD_RECOVERY" && session?.user) recovery = true;
         if (event === "SIGNED_OUT") recovery = false;
         setTimeout(() => onChange(event, session), 0);
       });
+      if (recoveryCode) {
+        // Exchange exactly once and wait for Supabase to confirm the recovery flow.
+        const { data, error } = await client.auth.exchangeCodeForSession(recoveryCode);
+        if (error) throw error;
+        recovery = data?.redirectType === "recovery" && Boolean(data.session?.user);
+        return data?.session ?? null;
+      }
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
       return data.session;

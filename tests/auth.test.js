@@ -61,6 +61,39 @@ test("password change requires a real recovery event rather than a reset URL", a
   assert.equal(updated, true);
   assert.equal(auth.recovery, false);
 });
+test("a recovery callback waits for a successful, recovery-specific PKCE exchange", async () => {
+  const session = { user: { id: "user-a" } };
+  const exchangeCalls = [];
+  let redirectType = "recovery", exchangeError = null;
+  const sdk = { createClient(_url, _key, options) {
+    assert.equal(options.auth.detectSessionInUrl, false);
+    return { auth: {
+      onAuthStateChange() {},
+      async exchangeCodeForSession(code) {
+        exchangeCalls.push(code);
+        return { data: { session, redirectType }, error: exchangeError };
+      },
+      async getSession() { assert.fail("Recovery must verify its code, even if a saved session exists."); }
+    } };
+  } };
+  const auth = createAuthService(config, { loadSDK: async () => sdk });
+  assert.equal(await auth.init({ recoveryCode: "reset-code" }), session);
+  assert.equal(auth.recovery, true);
+  assert.deepEqual(exchangeCalls, ["reset-code"]);
+  assert.doesNotMatch(authPage({ mode: "reset", configured: true, recovery: auth.recovery }), /type="submit"[^>]+disabled/);
+
+  redirectType = null;
+  const signIn = createAuthService(config, { loadSDK: async () => sdk });
+  await signIn.init({ recoveryCode: "sign-in-code" });
+  assert.equal(signIn.recovery, false);
+  assert.match(authPage({ mode: "reset", configured: true, recovery: signIn.recovery }), /Send a new reset link/);
+  assert.match(authPage({ mode: "reset", configured: true, recovery: signIn.recovery }), /type="submit"[^>]+disabled/);
+
+  exchangeError = new Error("Invalid recovery code");
+  const expired = createAuthService(config, { loadSDK: async () => sdk });
+  await assert.rejects(expired.init({ recoveryCode: "expired-code" }), /Invalid recovery code/);
+  assert.equal(expired.recovery, false);
+});
 test("unconfigured auth cannot fabricate a session and the form clearly reports unavailable service", async () => {
   const auth = createAuthService({}, { loadSDK: () => {
     throw Error("must not load");

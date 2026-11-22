@@ -49,6 +49,8 @@ const write = (key, value) => {
   }
 };
 const auth = createAuthService(supabaseConfig, { onChange: handleAuthChange });
+const authCallbackURL = new URL(location.href);
+const recoveryCallback = authCallbackURL.searchParams.get("auth") === "recovery";
 const anime = catalog;
 const byId = (id) => anime.find((item) => item.id === id);
 const genres = [...new Set(anime.flatMap((item) => item.tags))].sort();
@@ -1948,7 +1950,7 @@ async function handleAuthChange(event, session) {
     } else if (["login", "signup", "verify-email"].includes(currentRoute().page)) go("profile");
     else render({ keepScroll: true });
   } else authUser = next;
-  if (event === "PASSWORD_RECOVERY") {
+  if (event === "PASSWORD_RECOVERY" && auth.recovery) {
     go("reset-password");
     return;
   }
@@ -1959,11 +1961,12 @@ async function handleAuthChange(event, session) {
 }
 async function bootAuth() {
   try {
-    const session = await auth.init();
+    const recoveryCode = recoveryCallback ? authCallbackURL.searchParams.get("code") : null;
+    const session = await auth.init({ recoveryCode });
     authLoading = false;
     await handleAuthChange("INITIAL_SESSION", session);
     const url = new URL(location.href);
-    if (url.searchParams.has("auth") || url.searchParams.has("code")) {
+    if (!recoveryCallback && (url.searchParams.has("auth") || url.searchParams.has("code"))) {
       const error = url.searchParams.get("error_description");
       url.searchParams.delete("code");
       url.searchParams.delete("auth");
@@ -1977,7 +1980,13 @@ async function bootAuth() {
   } catch (error) {
     authLoading = false;
     if (!navigator.onLine) await handleAuthChange("INITIAL_SESSION", null);
-    else toast(friendlyAuthError(error));
+    else if (!recoveryCallback) toast(friendlyAuthError(error));
+  } finally {
+    if (recoveryCallback) {
+      const url = new URL(location.href);
+      for (const key of ["auth", "code", "sb_flow_id", "error", "error_code", "error_description"]) url.searchParams.delete(key);
+      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+    }
   }
   const page = currentRoute().page;
   if (["login", "signup", "forgot-password", "reset-password"].includes(page) || (isMembershipRoute(page) && !canAccessMembership())) {
@@ -2017,6 +2026,7 @@ async function submitAuthForm(form, data) {
   }
 }
 if (!Number.isInteger(history.state?.aniverseDepth)) history.replaceState({ aniverseDepth: 0 }, "", location.href);
+if (recoveryCallback) history.replaceState(history.state, "", location.pathname + location.search + "#reset-password");
 let lastRoute = currentRoute();
 window.addEventListener("hashchange", () => {
   if (sheet.open) closeSheet();
