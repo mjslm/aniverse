@@ -2,7 +2,7 @@
 
 AniVerse is a mobile-friendly anime catalog and watchlist built with React, Tailwind CSS, and Supabase. It supports title previews, saved watchlists, and offline playback for configured episode videos.
 
-[Live site](https://aniverse-slmn.vercel.app/) · [GitHub repository](https://github.com/mjslm/aniverse)
+[Live site](aniverse-slmn-v2.vercel.app) · [GitHub repository](https://github.com/mjslm/aniverse)
 
 ## Run locally
 
