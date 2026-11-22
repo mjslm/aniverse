@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { catalog } from "../dist/content/catalog.js";
-import { media } from "../dist/content/media.js";
+import { media, localEpisodeFiles } from "../dist/content/media.js";
 import { titlePreviews } from "../dist/content/previews.js";
 import { previewSource, isYouTubeSource, youTubeEmbedURL } from "../dist/modules/preview-source.js";
 import { videoApiResult } from "../dist/modules/video-api.js";
-import { fetchEpisodeSource } from "../dist/modules/video-client.js";
-import { orderedEpisodes, episodeKey } from "../dist/modules/catalog.js";
+import { fetchEpisodeSource, fetchLocalEpisodeSource } from "../dist/modules/video-client.js";
+import { orderedEpisodes, episodeKey, seasonFor } from "../dist/modules/catalog.js";
 import videosAPI from "../api/videos.js";
 import healthAPI from "../api/health.js";
 const expectedEpisodes = catalog.reduce((sum, anime) => sum + anime.episodes, 0);
@@ -118,4 +118,26 @@ test("the player client consumes the real API response and falls back safely on 
   }), fallback);
   const wrong = media["demon:s1:3"];
   assert.deepEqual(await fetchEpisodeSource("demon:s1:3", wrong, async () => Response.json({ ok: true, video: { key: "wrong", url: "javascript:bad" } })), wrong);
+});
+
+test("local episode files target the original Season 1 without changing existing routes", async () => {
+  assert.equal(Object.keys(localEpisodeFiles).length, 4);
+  for (const [key, filename] of Object.entries(localEpisodeFiles)) {
+    const [id, seasonId, episode] = key.split(":");
+    const anime = catalog.find((item) => item.id === id);
+    const season = seasonFor(anime, seasonId);
+    assert.equal(season.id, seasonId);
+    assert.equal(season.name, "Season 1");
+    assert(season.episodes.some((item) => item.number === Number(episode)));
+    assert.equal(seasonFor(anime).id, anime.defaultSeason);
+    const source = await fetchLocalEpisodeSource(key, "localhost", async (url, options) => {
+      assert.equal(url, filename);
+      assert.equal(options.method, "HEAD");
+      return new Response(null, { headers: { "Content-Type": "video/mp4" } });
+    });
+    assert.equal(source?.url, filename);
+  }
+  assert.equal(await fetchLocalEpisodeSource("aot:season-1:1", "localhost", async () => new Response(null, { status: 404 })), null);
+  assert.equal(await fetchLocalEpisodeSource("frieren:s1:1", "localhost", async () => new Response("<html>Wrong file</html>", { headers: { "Content-Type": "text/html" } })), null);
+  assert.equal(await fetchLocalEpisodeSource("frieren:s1:1", "aniverse.vercel.app", () => assert.fail("Public sites use configured HTTPS sources")), null);
 });

@@ -1,38 +1,49 @@
-# AniVerse — Setup and Source Code Guide
+# AniVerse
 
-AniVerse is a mobile-friendly anime catalog and watchlist web app. It uses React for rendering, Tailwind CSS and custom styles for the interface, and Supabase for authentication and saved account data.
+AniVerse is a mobile-friendly anime catalog and watchlist built with React, Tailwind CSS, and Supabase. It supports title previews, saved watchlists, and offline playback for configured episode videos.
 
-- [Live AniVerse website](https://aniverse-slmn.vercel.app/)
-- [GitHub repository](https://github.com/mjslm/aniverse)
+[Live site](https://aniverse-slmn.vercel.app/) · [GitHub repository](https://github.com/mjslm/aniverse)
 
 ## Run locally
 
 1. Install **Node.js 22 or newer**.
-2. Clone the repository or extract the submitted ZIP.
-3. Open the folder containing `package.json` in VS Code.
-4. Run these commands in the terminal:
+2. Clone the repository or extract the project ZIP. Open the folder containing `package.json` in VS Code.
+3. If you already have a configured local `app.config.json`, you can use it. For a fresh clone, copy `.env.example` to `.env` and use the project URL and publishable key from the project owner or your own Supabase project.
 
-```powershell
-npm.cmd ci --include=dev
-npm.cmd run dev
-```
+   ```dotenv
+   SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_PUBLIC_KEY
+   ```
 
-Use `npm` instead of `npm.cmd` on macOS and Linux. Open [http://localhost:3000](http://localhost:3000) or the address printed in the terminal. Keep the terminal running while using the app.
+4. Run the following in PowerShell. On macOS or Linux, use `npm` in place of `npm.cmd`.
 
-## Review the app
+   ```powershell
+   npm.cmd ci --include=dev
+   npm.cmd run dev
+   ```
 
-1. As a guest, search for **demon**, open **Demon Slayer**, and try the title preview.
-2. Confirm that guests can browse the catalog and that membership options are hidden.
-3. Create an account or log in. If email confirmation is enabled, open the confirmation link in the same browser.
-4. Save an anime and check that it appears in the Watchlist.
-5. Sign in with an account without active VIP. The Premium upgrade card should appear on Home. Choose a plan and subscribe, then return to Home. The card should disappear and Profile should show active VIP. Membership activation is free. The payment choices are display controls.
-6. To check the video API, open [http://localhost:3000/api/health](http://localhost:3000/api/health) and look for `"ok": true`.
+Open [localhost:3000](http://localhost:3000) or the address printed in the terminal. Keep local configuration files out of Git.
 
-The catalog includes official title previews. Playback and offline downloads for an episode depend on its configured video source.
+## Try the app
+
+Search for **demon** as a guest to see title suggestions. Sign in to save an anime to your **Watchlist**. The VIP subscription flow is a free demo.
+
+### Offline playback
+
+With the episode auto-save update, place your demo MP4s in `dist/videos/` using these names:
+
+| Season 1, Episode 1 | Filename |
+| --- | --- |
+| Frieren | `frieren-s1e1.mp4` |
+| Demon Slayer | `demon-slayer-s1e1.mp4` |
+| Attack on Titan | `attack-on-titan-s1e1.mp4` |
+| Jujutsu Kaisen | `jujutsu-kaisen-s1e1.mp4` |
+
+Open the matching episode and press **Play** to start saving in the background, or **Download** to save it directly. Wait for **Downloaded**, then open **My Library → Downloaded → Play Offline** in the same browser. YouTube previews require an internet connection.
+
+The local MP4 folder is ignored by Git. For a deployed copy, configure direct HTTPS video URLs in `dist/content/media.js` for content you have permission to share. The host must allow downloads from your site.
 
 ## Run checks
-
-Open a second terminal in the project folder while the dev server is running, or stop the server with **Ctrl+C** first.
 
 ```powershell
 npm.cmd test
@@ -40,45 +51,32 @@ npm.cmd run build
 npm.cmd run check
 ```
 
-`test` runs automated tests. `build` compiles the frontend and validates project assets. `check` reports the Supabase connection status.
+These run the tests, build the frontend, and check the Supabase connection, respectively.
 
-## Find the source code
+## Source code
 
-| Path | What to review |
+| Path | What it contains |
 | --- | --- |
-| `dist/app.js` | Screen templates, navigation, watchlist, playback, and membership actions |
-| `src/frontend.jsx` | React rendering for screens and dialogs |
-| `src/tailwind.css`, `dist/styles.css` | Tailwind layout rules and custom interface styles |
-| `dist/modules/` | Authentication, account sync, search, and video helpers |
-| `dist/content/` | Anime catalog, preview metadata, and video sources |
-| `api/` | Video metadata and health endpoints |
-| `supabase/schema.sql`, `supabase/migrations/` | Database schema, ownership policies, and membership functions |
-| `scripts/`, `tests/` | Development server, build scripts, and automated tests |
-| `dist/manifest.webmanifest`, `dist/sw.js` | PWA installation metadata and offline caching |
+| `dist/app.js`, `dist/modules/` | Screens, navigation, search, account sync, and playback |
+| `src/frontend.jsx`, `src/tailwind.css`, `dist/styles.css` | React rendering and interface styles |
+| `dist/content/`, `api/` | Catalog, video sources, and API endpoints |
+| `dist/sw.js`, `dist/manifest.webmanifest` | Offline caching and app installation |
+| `supabase/`, `tests/` | Database schema, migrations, and automated tests |
 
-The build generates `dist/tailwind.css` and `dist/vendor/react-ui.js`. Edit the source files under `src/` to change these outputs.
+## Supabase and Vercel
 
-## Supabase setup
+For a new, empty Supabase project, run `supabase/schema.sql` and then the files in `supabase/migrations/` in filename order.
 
-A fresh clone needs the Supabase project URL and publishable key. Ask the project owner for the review project’s public settings or use your own Supabase project. A local `app.config.json` also works for an existing installation.
-
-For a separate, empty Supabase project, run `supabase/schema.sql` once, then the files in `supabase/migrations/` in filename order. For local setup, copy `.env.example` to `.env` and fill in both values:
-
-```dotenv
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_PUBLIC_KEY
-```
-
-Use the Supabase publishable key and keep local `.env` files out of Git. Under **Authentication → URL Configuration**, set the local Site URL to `http://localhost:3000` and allow the following redirects:
+In Supabase **Authentication → URL Configuration**, set **Site URL** to your deployed address, or `http://localhost:3000` for a local-only project. Add the redirects for whichever environments you use. [Supabase redirect guide](https://supabase.com/docs/guides/auth/redirect-urls)
 
 ```text
 http://localhost:3000/?auth=confirmed
 http://localhost:3000/?auth=recovery
+https://aniverse-slmn.vercel.app/?auth=confirmed
+https://aniverse-slmn.vercel.app/?auth=recovery
 ```
 
-## Deploy to Vercel
-
-AniVerse is deployed at [aniverse-slmn.vercel.app](https://aniverse-slmn.vercel.app/). To deploy another copy, import the GitHub repository into Vercel with these settings.
+Import the repository into Vercel and use these settings:
 
 | Setting | Value |
 | --- | --- |
@@ -88,13 +86,4 @@ AniVerse is deployed at [aniverse-slmn.vercel.app](https://aniverse-slmn.vercel.
 | Build Command | `npm run build` |
 | Output Directory | `dist` |
 
-In Vercel, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` under **Settings → Environment Variables** for Production. Add them to Preview too if you deploy preview builds.
-
-For the live site, use `https://aniverse-slmn.vercel.app` as the Supabase **Site URL** and allow these redirects:
-
-```text
-https://aniverse-slmn.vercel.app/?auth=confirmed
-https://aniverse-slmn.vercel.app/?auth=recovery
-```
-
-Keep the localhost redirects for local testing. Pushes to `main` trigger a Vercel deployment while the GitHub integration is connected. The live site updates after a successful build.
+Add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in **Settings → Environment Variables** for Production. Add them to Preview if you use preview builds. [Vercel environment variables guide](https://vercel.com/docs/environment-variables)

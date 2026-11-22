@@ -6,6 +6,7 @@ node_modules/
 .openai/
 *.log
 
+dist/videos/
 dist/tailwind.css
 dist/vendor/react-ui.js*
 

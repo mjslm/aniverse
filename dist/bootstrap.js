@@ -15,7 +15,7 @@ async function start() {
       console.warn('Local cache cleanup was unavailable:', error.message);
     }
   }
-  await import('./app.js?v=2.7.1');
+  await import('./app.js?v=2.7.3');
 }
 
 start().catch(error => {

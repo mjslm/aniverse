@@ -54,7 +54,8 @@ export function findAnime(catalog, query = "", filters = {}, sort = "relevance")
   return matches.map((item) => item.anime);
 }
 export function seasonFor(anime, seasonId) {
-  return anime?.seasons?.find((season) => season.id === seasonId) || anime?.seasons?.[0];
+  const seasons = anime?.seasons || [];
+  return seasons.find((season) => season.id === seasonId) || seasons.find((season) => season.id === anime.defaultSeason) || seasons[0];
 }
 export function episodeFor(anime, seasonId, number) {
   return seasonFor(anime, seasonId)?.episodes.find((episode) => episode.number === Number(number));
@@ -72,13 +73,20 @@ export function nextEpisode(anime, seasonId, number) {
 export function resumeEpisode(anime, records = {}) {
   const episodes = orderedEpisodes(anime);
   const played = episodes.filter((episode) => records[episodeKey(anime.id, episode.seasonId, episode.number)]).sort((a, b) => (records[episodeKey(anime.id, b.seasonId, b.number)].updatedAt || 0) - (records[episodeKey(anime.id, a.seasonId, a.number)].updatedAt || 0));
-  if (!played.length) return episodes[0];
+  if (!played.length) return episodes.find((episode) => episode.seasonId === anime.defaultSeason) || episodes[0];
   const latest = played[0], record = records[episodeKey(anime.id, latest.seasonId, latest.number)];
   return record.completed ? nextEpisode(anime, latest.seasonId, latest.number) || latest : latest;
 }
 export function watchStatistics(records = {}) {
   const entries = Object.values(records).filter((value) => value && typeof value === "object");
   return { episodes: entries.filter((value) => value.seconds > 0 || value.completed).length, completed: entries.filter((value) => value.completed).length, seconds: entries.reduce((sum, value) => sum + Number(value.watchedSeconds || 0), 0) };
+}
+export function profileStatistics(records = {}, library = {}, previews = {}) {
+  const { episodes, completed } = watchStatistics(records);
+  const completedTitles = Object.values(library).filter((status) => status === "Completed").length;
+  const finishedPreviews = Object.values(previews).filter((record) => record?.everCompleted || record?.completed).length;
+  const xp = completed * 100 + completedTitles * 50 + finishedPreviews * 25;
+  return { episodes, completedTitles, level: Math.floor(xp / 500) + 1, levelXP: xp % 500 };
 }
 export function parseRoute(hash = "") {
   const [path, query = ""] = String(hash).replace(/^#/, "").split("?");

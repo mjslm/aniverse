@@ -1,5 +1,22 @@
 import { previewSettings } from "../content/previews.js";
 import { safeMediaURL } from "./catalog.js";
+import { localEpisodeFiles } from "../content/media.js";
+import { isLocalPreview } from "./local-preview.js";
+export function localEpisodePath(key, hostname = location.hostname) {
+  return isLocalPreview(hostname) ? localEpisodeFiles[key] : undefined;
+}
+export async function fetchLocalEpisodeSource(key, hostname = location.hostname, fetcher = fetch) {
+  const url = localEpisodePath(key, hostname);
+  if (!url) return null;
+  try {
+    const response = await fetcher(url, { method: "HEAD", signal: AbortSignal.timeout(previewSettings.apiTimeoutMs) });
+    if (response.ok && response.headers.get("content-type")?.startsWith("video/")) {
+      return { url, audio: "ja" };
+    }
+  } catch {
+  }
+  return null;
+}
 const responses = new Map();
 export async function fetchEpisodeSource(key, fallback, fetcher = fetch) {
   const cached = responses.get(key);

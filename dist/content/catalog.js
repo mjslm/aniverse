@@ -11,7 +11,7 @@ export const catalog = [
     ],
     "studio": "MAPPA",
     "rating": 9.1,
-    "episodes": 4,
+    "episodes": 5,
     "year": 2023,
     "status": "Complete",
     "image": "875f7.png",
@@ -34,6 +34,20 @@ export const catalog = [
     "ageRating": "TV-MA",
     "addedAt": "2026-11-19T00:00:00Z",
     "seasons": [
+      {
+        "id": "season-1",
+        "number": 1,
+        "name": "Season 1",
+        "episodes": [
+          {
+            "number": 1,
+            "title": "Episode 1",
+            "image": "875f7.png",
+            "description": "Season 1 · Episode 1",
+            "duration": 1440
+          }
+        ]
+      },
       {
         "id": "s4p3",
         "number": 4,
@@ -122,7 +136,7 @@ export const catalog = [
     ],
     "studio": "MAPPA",
     "rating": 8.9,
-    "episodes": 24,
+    "episodes": 25,
     "year": 2023,
     "status": "Season 2",
     "image": "8c4f3.png",
@@ -144,8 +158,22 @@ export const catalog = [
     "addedAt": "2026-11-18T00:00:00Z",
     "seasons": [
       {
-        "id": "s1",
+        "id": "season-1",
         "number": 1,
+        "name": "Season 1",
+        "episodes": [
+          {
+            "number": 1,
+            "title": "Episode 1",
+            "image": "8c4f3.png",
+            "description": "Season 1 · Episode 1",
+            "duration": 1440
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "number": 2,
         "name": "Season 2 • Shibuya Arc",
         "episodes": [
           {
@@ -339,7 +367,7 @@ export const catalog = [
     ],
     "studio": "Ufotable",
     "rating": 8.7,
-    "episodes": 11,
+    "episodes": 12,
     "year": 2024,
     "status": "Arc 4",
     "image": "12b05.png",
@@ -362,8 +390,22 @@ export const catalog = [
     "addedAt": "2026-11-17T00:00:00Z",
     "seasons": [
       {
-        "id": "s1",
+        "id": "season-1",
         "number": 1,
+        "name": "Season 1",
+        "episodes": [
+          {
+            "number": 1,
+            "title": "Episode 1",
+            "image": "12b05.png",
+            "description": "Season 1 · Episode 1",
+            "duration": 1440
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "number": 4,
         "name": "Hashira Training Arc",
         "episodes": [
           {

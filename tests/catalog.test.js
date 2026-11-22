@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { catalog } from "../dist/content/catalog.js";
-import { normalize, findAnime, searchScore, episodeKey, episodeFor, orderedEpisodes, nextEpisode, resumeEpisode, watchStatistics, parseRoute, routeURL, safeMediaURL, sanitizeBackup } from "../dist/modules/catalog.js";
+import { normalize, findAnime, searchScore, episodeKey, episodeFor, orderedEpisodes, nextEpisode, resumeEpisode, watchStatistics, profileStatistics, parseRoute, routeURL, safeMediaURL, sanitizeBackup } from "../dist/modules/catalog.js";
+test("profile XP counts saved episodes, titles, and finished previews once per record", () => {
+  const library = { frieren: "Completed" };
+  assert.deepEqual(profileStatistics({}, library), { episodes: 0, completedTitles: 1, level: 1, levelXP: 50 });
+  const records = Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`frieren:s1:${i + 1}`, { completed: true }]));
+  const previews = { frieren: { completed: false, everCompleted: true }, demon: { completed: true }, oshi: { completed: false } };
+  assert.deepEqual(profileStatistics(records, library, previews), { episodes: 5, completedTitles: 1, level: 2, levelXP: 100 });
+});
 test("every available catalog title is searchable and blank search includes the entire catalog", () => {
   assert.equal(findAnime(catalog).length, catalog.length);
   for (const anime of catalog) {

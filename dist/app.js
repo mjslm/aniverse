@@ -4,14 +4,14 @@ import { createAuthService, friendlyAuthError } from "./modules/auth.js";
 import { authPage } from "./modules/auth-ui.js";
 import { accountStorageKey, defaultPreferences, mergeAccountState, pullAccount, pushAccount } from "./modules/account-store.js";
 import { catalog } from "./content/catalog.js";
-import { fetchEpisodeSource } from "./modules/video-client.js";
+import { fetchEpisodeSource, fetchLocalEpisodeSource, localEpisodePath } from "./modules/video-client.js";
 import { previewSource, isYouTubeSource } from "./modules/preview-source.js";
 import { mountYouTube } from "./modules/youtube-player.js";
 import { animatePage, installFeedback } from "./modules/motion.js";
 import { bindSearchSuggestions } from "./modules/search-suggestions.js";
 import { createProfilePhoto, storedProfilePhoto } from "./modules/profile-photo.js";
 import { media as configuredMedia } from "./content/media.js";
-import { normalize, findAnime, seasonFor, episodeFor, episodeKey, orderedEpisodes, nextEpisode, resumeEpisode, watchStatistics, parseRoute, routeURL, safeMediaURL, sanitizeBackup } from "./modules/catalog.js";
+import { normalize, findAnime, seasonFor, episodeFor, episodeKey, orderedEpisodes, nextEpisode, resumeEpisode, profileStatistics, parseRoute, routeURL, safeMediaURL, sanitizeBackup } from "./modules/catalog.js";
 const $ = (selector, root = document) => root.querySelector(selector);
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const A = (file) => `./assets/${file}`;
@@ -366,7 +366,7 @@ function watchingCard(id) {
 }
 function watchlistCard(id, episodeOverride) {
   const a = byId(id), episode = episodeOverride || resumeEpisode(a, progress), [file, style, base] = posterSpec(a, "watch"), completed = library[id] === "Completed";
-  return `<article class="watchlist-card"><a href="#detail/${id}"><div class="poster">${crop(file, a.title, style, base)}${rating(a.rating, "62b6f.svg")}<span class="episode-bottom">${episodeOverride ? `EPISODE ${episode.number} · OFFLINE` : a.episodes + " EPISODES"}</span></div><div class="info"><h3>${esc(a.short)}</h3><p class="ellipsis">${esc(a.genre)}</p></div></a><div class="info" style="padding-top:0"><a class="btn full" href="${episodeLink(a, episode)}">${icon("712e8.svg")}${completed ? "Rewatch" : episodeOverride ? "Play Offline" : `Start Ep ${episode.number}`}</a></div>${episodeOverride ? `<button class="bookmark" data-action="remove-local-video" data-key="${esc(episodeKey(id, episode.seasonId, episode.number))}" aria-label="Remove offline episode ${episode.number}">×</button>` : `<button class="bookmark" data-action="edit-library" data-id="${id}" aria-label="Manage ${esc(a.short)}">${icon("78b0c.svg")}</button>`}</article>`;
+  return `<article class="watchlist-card"><a href="#detail/${id}"><div class="poster">${crop(file, a.title, style, base)}${rating(a.rating, "62b6f.svg")}<span class="episode-bottom">${episodeOverride ? `EPISODE ${episode.number} · OFFLINE` : a.episodes + " EPISODES"}</span></div><div class="info"><h3>${esc(a.short)}</h3><p class="ellipsis">${esc(a.genre)}</p></div></a><div class="info" style="padding-top:0"><a class="btn full" href="${episodeLink(a, episode)}${episodeOverride ? "&offline=1" : ""}">${icon("712e8.svg")}${episodeOverride ? "Play Offline" : completed ? "Rewatch" : `Start Ep ${episode.number}`}</a></div>${episodeOverride ? `<button class="bookmark" data-action="remove-local-video" data-key="${esc(episodeKey(id, episode.seasonId, episode.number))}" aria-label="Remove offline episode ${episode.number}">×</button>` : `<button class="bookmark" data-action="edit-library" data-id="${id}" aria-label="Manage ${esc(a.short)}">${icon("78b0c.svg")}</button>`}</article>`;
 }
 function sortedLibrary(ids) {
   const times = read("library-times", {});
@@ -396,9 +396,7 @@ function preferenceSwitch(file, title, description, pref) {
   </div>`;
 }
 function profilePage() {
-  const stats = watchStatistics(progress);
-  const completed = Object.values(library).filter((status) => status === "Completed").length;
-  const xp = stats.completed * 100, level = Math.floor(xp / 500) + 1, levelXP = xp % 500;
+  const { episodes, completedTitles, level, levelXP } = profileStatistics(progress, library, read("preview-progress-v1", {}));
   const photo = storedProfilePhoto(read("profile-photo", "")) || A("2d8b9.png");
   const device = /iPhone|iPad/.test(navigator.userAgent) ? "iPhone / iPad" : /Android/.test(navigator.userAgent) ? "Android browser" : "Desktop browser";
   const verified = authUser?.email_confirmed_at ? `<svg class="verified-badge" viewBox="0 0 20 20" role="img" aria-label="Email verified"><path fill="currentColor" d="m10 0 2.6 2.1 3.3-.2.9 3.2 2.7 1.9-1.2 3.1.6 3.3-3 1.4-1.5 2.9-3.2-.6L8 19l-1.9-2.7-3.2-.9.2-3.3L1 9.5l2.1-2.6-.2-3.3 3.2-.9L8 0z"/><path d="m6 9.5 2.5 2.5L14 6.5" fill="none" stroke="#111318" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>` : "";
@@ -427,9 +425,8 @@ function profilePage() {
         <div class="progress" style="--progress:${levelXP / 5}%" role="progressbar" aria-label="Watcher level progress" aria-valuemin="0" aria-valuemax="500" aria-valuenow="${levelXP}"><i></i></div>
       </section>
       <div class="stats-row" aria-label="Your watch statistics">
-        <div class="stat"><div class="row">${icon("10c86.svg")}<strong>${stats.episodes}</strong></div><small>EPISODES</small></div>
-        <div class="stat"><div class="row">${icon("57ab8.svg")}<strong>${completed}</strong></div><small>COMPLETED</small></div>
-        <div class="stat"><div class="row">${icon("0e174.svg")}<strong>${(stats.seconds / 3600).toFixed(1)}</strong><small>h</small></div><small>STREAM TIME</small></div>
+        <div class="stat"><div class="row">${icon("10c86.svg")}<strong>${episodes}</strong></div><small>EPISODES</small></div>
+        <div class="stat"><div class="row">${icon("57ab8.svg")}<strong>${completedTitles}</strong></div><small>TITLES COMPLETED</small></div>
       </div>
       ${membershipAvailable ? `<section class="subscription-card" aria-label="VIP membership">
         <div class="profile-plan-heading">
@@ -477,7 +474,10 @@ function detailEpisode(episode, a, season) {
   return `<article class="detail-episode ${record?.seconds && !record.completed ? "active" : ""}"><a class="episode-top" href="${episodeLink(a, { ...episode, seasonId: season.id })}"><span class="episode-thumb art">${art(episode.image || a.image, `${a.short} episode ${number}`, "width:100%;height:100%")}<span class="play-disc">${icon("7efa4.svg")}</span><span class="duration">${Math.max(1, Math.max(1, Math.round((record?.duration || episode.duration || 1440) / 60)))}m</span></span><span class="grow"><span class="eyebrow peach">EPISODE ${number}${record?.completed ? " • WATCHED" : record?.seconds ? " • RESUME" : ""}</span><h3>${esc(episode.title)}</h3><span class="episode-meta">${cachedIds.includes(key) ? "Saved offline" : available ? sourceFor(key)?.preview ? "Sample clip" : sourceFor(key)?.demo ? "Demo video ready" : "Video available" : "Add a video source"}</span></span></a><button class="download-ep" data-action="download" data-key="${key}" aria-label="Download episode ${number}">${icon("45dee.svg")}</button><p class="clamp">${esc(episode.description || a.description)}</p><button class="text-button micro" data-action="mark-episode" data-key="${key}">${record?.completed ? "Mark Unwatched" : "Mark as Watched"}</button></article>`;
 }
 function detail(id) {
-  const a = byId(id), season = seasonFor(a, currentRoute().seasonId), resume = resumeEpisode(a, progress), isAot = id === "aot", related = (a.related?.length ? a.related : findAnime(anime, "", { genre: a.tags[0] }, "rating").filter((item) => item.id !== id).slice(0, 5).map((item) => item.id)).map(byId).filter(Boolean);
+  const a = byId(id), seasonId = currentRoute().seasonId, season = seasonFor(a, seasonId);
+  const lastEpisode = resumeEpisode(a, progress);
+  const resume = seasonId && season.id !== lastEpisode.seasonId ? { ...season.episodes[0], seasonId: season.id, seasonNumber: season.number } : lastEpisode;
+  const isAot = id === "aot", related = (a.related?.length ? a.related : findAnime(anime, "", { genre: a.tags[0] }, "rating").filter((item) => item.id !== id).slice(0, 5).map((item) => item.id)).map(byId).filter(Boolean);
   return `${header("Series Detail")}<main class="detail-page"><section class="detail-hero art">${isAot ? crop("7ab29.png", a.title, "left:1px;top:-70px;width:calc(100% + 8px);height:calc(100% + 268px)", "2f8bb.png") : art(a.image, a.title, "width:100%;height:100%")}<div class="hero-words"><div class="badge-row"><span class="pill hot">${esc(a.status)}</span><span class="pill cyan">${a.episodes} EPISODES</span><span class="pill">${esc(a.type)}</span></div><h1>${esc(a.short)}</h1><p>${esc(season.name)}</p><div class="badge-row" style="margin-top:8px">${rating(a.rating, "714ef.svg")}<span class="pill">${esc(a.ageRating)}</span><span class="pill">${a.year}</span><span class="pill cyan">${esc(a.studio)}</span></div></div></section><div class="detail-body"><a class="btn primary full" href="${episodeLink(a, resume)}">${icon("25540.svg")}${progress[episodeKey(id, resume.seasonId, resume.number)] ? "Continue" : "Watch"} S${resume.seasonNumber}:E${resume.number}</a><div class="quick-actions"><button class="quick-action" data-action="save" data-id="${id}">${icon("c3bd1.svg")}${library[id] ? "Saved" : "Watchlist"}</button><button class="quick-action" data-action="download-all" data-id="${id}">${icon("4d912.svg")}Download All</button><button class="quick-action" data-action="${a.trailer ? "trailer" : "source-list"}" data-id="${id}">${icon("e8a01.svg")}${a.trailer ? "Trailer" : "Video Sources"}</button></div><div class="genre-tags">${a.tags.map((tag) => `<button data-action="genre-search" data-value="${esc(tag)}">${esc(tag)}</button>`).join("")}</div><div class="synopsis-box"><p id="synopsis-text" class="clamp" style="-webkit-line-clamp:3">${esc(a.description)}</p><button class="read-more" data-action="read-more">Read More ${icon("9773a.svg")}</button></div><section class="episodes-section"><div class="section-title"><h2>Episodes</h2><span class="small">${a.episodes} Total</span></div><div class="chips season-tabs">${a.seasons.map((item) => `<button class="chip ${season.id === item.id ? "active" : ""}" data-action="season" data-value="${item.id}" aria-pressed="${season.id === item.id}">${esc(item.name)}</button>`).join("")}</div><div id="detail-episodes">${season.episodes.map((episode) => detailEpisode(episode, a, season)).join("")}</div></section>${a.cast?.length ? `<section class="cast-section"><div class="section-title"><h2>Cast &amp; Crew</h2><button class="text-button micro" data-action="cast">All (${a.cast.length})</button></div><div class="cast-carousel">${a.cast.map((member, i) => `<div class="cast-member">${crop(member.image, member.name, i === 1 ? "top:-39.51%;height:179.02%" : i > 1 ? "left:-41.76%;width:183.51%" : "")}<strong>${esc(member.name)}</strong><small>${esc(member.role)}</small></div>`).join("")}</div></section>` : ""}<section class="related-section"><div class="section-title"><h2>More Like This</h2><span class="eyebrow">Recommended</span></div><div class="carousel">${related.map((item) => `<a class="poster-card" href="#detail/${item.id}"><div class="poster">${art(item.watch || item.image, item.title, "width:100%;height:100%")}</div><div class="poster-info"><h3>${esc(item.short)}</h3><p class="muted ellipsis">${esc(item.genre)}</p></div></a>`).join("")}</div></section></div></main>`;
 }
 function playerEpisode(episode, a, season, active) {
@@ -504,7 +504,7 @@ function updatePlayerPanel() {
 }
 function playerPage(id) {
   const { anime: a, season, episode } = currentEpisode(), key = episodeKey(id, season.id, episode.number), source = sourceFor(key), next = nextEpisode(a, season.id, episode.number);
-  return `${header("Episode Playback")}<main class="player-page"><section class="video-wrap" id="video-wrap" tabindex="0" aria-label="Video player. Space to play or pause, left and right to seek."><img class="player-poster" src="${A(episode.playerImage || episode.image || a.image)}" alt="${esc(a.short)} episode ${episode.number} poster"><div class="poster-scrim"></div><video id="video" playsinline preload="metadata" aria-label="${esc(a.short)} episode ${episode.number}" class="hidden"></video><div class="video-top"><span class="pill" id="audio-label">${esc(source?.audio === "en" ? "EN AUDIO" : "JP AUDIO")}</span><span class="pill cyan" id="caption-label">CC</span><span class="video-tools"><button class="video-tool" data-action="lock" aria-label="Lock player">${icon("71e6d.svg")}</button><button class="video-tool" data-action="cast-video" aria-label="Cast video">${icon("90014.svg")}</button><button class="video-tool" data-action="playback-settings" aria-label="Playback settings">${icon("001f8.svg")}</button></span></div><div class="playback-controls"><button class="video-tool" data-action="seek" data-seconds="-10" aria-label="Rewind 10 seconds">${icon("d2905.svg")}</button><button class="big-play" id="play-pause" data-action="play" aria-label="Play video"><span style="font-size:28px">▶</span></button><button class="video-tool" data-action="seek" data-seconds="10" aria-label="Forward 10 seconds">${icon("e0468.svg")}</button></div><div class="video-bottom"><button class="skip-intro" data-action="skip-intro" ${episode.introEnd || source?.introEnd ? "" : "hidden"}>${icon("15dae.svg")}SKIP INTRO</button><input id="seekbar" type="range" min="0" max="1000" value="0" aria-label="Video position"><div class="video-time"><span id="time-display">00:00 / --:--</span><span class="pill cyan" id="resolution-label">${source ? "Loading video…" : "No source yet"}</span><button class="speed" data-action="speed">1.0×</button><button data-action="fullscreen" aria-label="Enter fullscreen">${icon("98afb.svg")}</button></div></div><div id="video-message" role="status" class="video-message hidden"></div></section><div class="player-body"><div class="row between"><p class="eyebrow orange">EPISODE ${episode.number}</p><span class="pill peach">${icon("0e810.svg")}${a.rating}</span></div><h1>${esc(episode.title)}</h1><div class="player-meta"><span>${esc(a.short)} · ${esc(season.name)}</span><span class="muted">•</span><span class="muted">${a.year}</span><span class="pill">${esc(a.ageRating)}</span></div><p class="player-notice">${source || cachedIds.includes(key) ? "Resume progress is saved automatically on this device." : "Add a video source for this episode in Playback Settings."}</p><div class="quick-actions player-actions"><button class="quick-action" data-action="download" data-key="${key}">${icon("29e94.svg")}Download</button><button class="quick-action" data-action="save" data-id="${id}">${icon("1a1f6.svg")}${library[id] ? "Saved" : "Save"}</button><button class="quick-action" data-action="audio-sub">${icon("a33cb.svg")}Audio/Sub</button><button class="quick-action" data-action="share" data-id="${id}">${icon("14a13.svg")}Share</button></div><div class="row between episode-navigation"><button class="text-button" data-action="previous-episode">Previous Episode</button>${next ? `<a class="text-button" href="${episodeLink(a, next)}">Next Episode</a>` : '<span class="micro muted">Final Episode</span>'}</div><p class="player-description clamp">${esc(episode.description || a.description)}</p><div class="player-tabs" role="tablist">${["Episodes", "Related", "Discussion"].map((tab) => `<button role="tab" class="${playerTab === tab ? "active" : ""}" data-action="player-tab" data-value="${tab}" aria-selected="${playerTab === tab}">${tab === "Discussion" ? "My Notes" : tab}</button>`).join("")}</div><section id="player-panel">${playerPanelMarkup()}</section></div></main>`;
+  return `${header("Episode Playback")}<main class="player-page"><section class="video-wrap" id="video-wrap" tabindex="0" aria-label="Video player. Space to play or pause, left and right to seek."><img class="player-poster" src="${A(episode.playerImage || episode.image || a.image)}" alt="${esc(a.short)} episode ${episode.number} poster"><div class="poster-scrim"></div><video id="video" playsinline preload="metadata" aria-label="${esc(a.short)} episode ${episode.number}" class="hidden"></video><div class="video-top"><span class="pill" id="audio-label">${esc(source?.audio === "en" ? "EN AUDIO" : "JP AUDIO")}</span><span class="pill cyan" id="caption-label">CC</span><span class="video-tools"><button class="video-tool" data-action="lock" aria-label="Lock player">${icon("71e6d.svg")}</button><button class="video-tool" data-action="cast-video" aria-label="Cast video">${icon("90014.svg")}</button><button class="video-tool" data-action="playback-settings" aria-label="Playback settings">${icon("001f8.svg")}</button></span></div><div class="playback-controls"><button class="video-tool" data-action="seek" data-seconds="-10" aria-label="Rewind 10 seconds">${icon("d2905.svg")}</button><button class="big-play" id="play-pause" data-action="play" aria-label="Play video"><span style="font-size:28px">▶</span></button><button class="video-tool" data-action="seek" data-seconds="10" aria-label="Forward 10 seconds">${icon("e0468.svg")}</button></div><div class="video-bottom"><button class="skip-intro" data-action="skip-intro" ${episode.introEnd || source?.introEnd ? "" : "hidden"}>${icon("15dae.svg")}SKIP INTRO</button><input id="seekbar" type="range" min="0" max="1000" value="0" aria-label="Video position"><div class="video-time"><span id="time-display">00:00 / --:--</span><span class="pill cyan" id="resolution-label">${source ? "Loading video…" : "No source yet"}</span><button class="speed" data-action="speed">1.0×</button><button data-action="fullscreen" aria-label="Enter fullscreen">${icon("98afb.svg")}</button></div></div><div id="video-message" role="status" class="video-message hidden"></div></section><div class="player-body"><div class="row between"><p class="eyebrow orange">EPISODE ${episode.number}</p><span class="pill peach">${icon("0e810.svg")}${a.rating}</span></div><h1>${esc(episode.title)}</h1><div class="player-meta"><span>${esc(a.short)} · ${esc(season.name)}</span><span class="muted">•</span><span class="muted">${a.year}</span><span class="pill">${esc(a.ageRating)}</span></div><p class="player-notice">${source || cachedIds.includes(key) ? "Resume progress is saved automatically on this device." : "Add a video source for this episode in Playback Settings."}</p><div class="quick-actions player-actions"><button class="quick-action" data-action="download" data-key="${key}">${icon("29e94.svg")}${cachedIds.includes(key) ? "Downloaded" : "Download"}</button><button class="quick-action" data-action="save" data-id="${id}">${icon("1a1f6.svg")}${library[id] ? "Saved" : "Save"}</button><button class="quick-action" data-action="audio-sub">${icon("a33cb.svg")}Audio/Sub</button><button class="quick-action" data-action="share" data-id="${id}">${icon("14a13.svg")}Share</button></div><div class="row between episode-navigation"><button class="text-button" data-action="previous-episode">Previous Episode</button>${next ? `<a class="text-button" href="${episodeLink(a, next)}">Next Episode</a>` : '<span class="micro muted">Final Episode</span>'}</div><p class="player-description clamp">${esc(episode.description || a.description)}</p><div class="player-tabs" role="tablist">${["Episodes", "Related", "Discussion"].map((tab) => `<button role="tab" class="${playerTab === tab ? "active" : ""}" data-action="player-tab" data-value="${tab}" aria-selected="${playerTab === tab}">${tab === "Discussion" ? "My Notes" : tab}</button>`).join("")}</div><section id="player-panel">${playerPanelMarkup()}</section></div></main>`;
 }
 function notificationsPage() {
   const list = events.filter((item) => notificationTab === "All" || item.type === notificationTab);
@@ -605,16 +605,16 @@ function db() {
   });
   return databasePromise;
 }
-async function getStored(store, key) {
-  const storageKey = accountOwner === "guest" ? key : `${accountOwner}|${key}`, database = await db();
+async function getStored(store, key, owner = accountOwner) {
+  const storageKey = owner === "guest" ? key : `${owner}|${key}`, database = await db();
   return new Promise((resolve, reject) => {
     const request = database.transaction(store).objectStore(store).get(storageKey);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
-async function putStored(store, key, value) {
-  const storageKey = accountOwner === "guest" ? key : `${accountOwner}|${key}`, database = await db();
+async function putStored(store, key, value, owner = accountOwner) {
+  const storageKey = owner === "guest" ? key : `${owner}|${key}`, database = await db();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(store, "readwrite");
     transaction.objectStore(store).put(value, storageKey);
@@ -623,8 +623,8 @@ async function putStored(store, key, value) {
     transaction.onabort = () => reject(transaction.error || new Error("The file could not be saved."));
   });
 }
-async function deleteStored(store, key) {
-  const storageKey = accountOwner === "guest" ? key : `${accountOwner}|${key}`, database = await db();
+async function deleteStored(store, key, owner = accountOwner) {
+  const storageKey = owner === "guest" ? key : `${owner}|${key}`, database = await db();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(store, "readwrite");
     transaction.objectStore(store).delete(storageKey);
@@ -658,15 +658,16 @@ function migratePlaybackData() {
   write("playback-migrated-v2", true);
 }
 async function localVideo(key) {
+  const owner = accountOwner;
   try {
-    let file = await getStored("videos", key);
+    let file = await getStored("videos", key, owner);
     if (file) return file;
     const item = episodeFromKey(key);
     if (item && key === legacyKeyFor(item.anime)) {
-      file = await getStored("videos", item.anime.id);
+      file = await getStored("videos", item.anime.id, owner);
       if (file) {
-        await putStored("videos", key, file);
-        await deleteStored("videos", item.anime.id);
+        await putStored("videos", key, file, owner);
+        await deleteStored("videos", item.anime.id, owner);
         return file;
       }
     }
@@ -679,9 +680,14 @@ async function saveVideo(key, file) {
   if (!episodeFromKey(key)) throw new Error("Choose a valid episode first.");
   const owner = accountOwner;
   await putStored("videos", key, file);
-  if (owner !== accountOwner) return;
-  if (!cachedIds.includes(key)) cachedIds.push(key);
-  write("cached-episode-keys-v2", cachedIds);
+  return indexDownload(key, owner);
+}
+function indexDownload(key, owner) {
+  const storageKey = accountStorageKey("cached-episode-keys-v2", owner);
+  const keys = JSON.parse(localStorage.getItem(storageKey)) || [];
+  if (!keys.includes(key)) localStorage.setItem(storageKey, JSON.stringify([...keys, key]));
+  if (owner === accountOwner) cachedIds = keys.includes(key) ? keys : [...keys, key];
+  return owner === accountOwner;
 }
 function selectSource(raw) {
   if (!raw) return null;
@@ -696,6 +702,14 @@ function selectSource(raw) {
 function sourceFor(key) {
   const item = episodeFromKey(key);
   return selectSource(runtimeSources.get(key)) || selectSource(sources[key]) || selectSource(configuredMedia[key]) || selectSource(item?.episode.video);
+}
+function canSaveSource(source) {
+  return Boolean(source?.url && !source.preview && !isYouTubeSource(source));
+}
+async function resolveEpisodeSource(key) {
+  const fallback = sourceFor(key);
+  if (runtimeSources.has(key) || canSaveSource(fallback)) return fallback;
+  return await fetchLocalEpisodeSource(key) || selectSource(await fetchEpisodeSource(key, fallback));
 }
 function showTitlePreview(source, { autoplay = false } = {}) {
   const video = player, wrap = $("#video-wrap"), owner = accountOwner;
@@ -712,10 +726,9 @@ function showTitlePreview(source, { autoplay = false } = {}) {
     onProgress: (record) => {
       // Sample progress must never mark an episode as watched.
       if (owner !== accountOwner || record.seconds <= 0 || record.duration <= 0) return;
-      write("preview-progress-v1", {
-        ...read("preview-progress-v1", {}),
-        [source.animeId]: { ...record, episodeKey: source.key, updatedAt: Date.now() }
-      });
+      const previews = read("preview-progress-v1", {}), saved = previews[source.animeId];
+      const everCompleted = Boolean(saved?.everCompleted || saved?.completed || record.completed);
+      write("preview-progress-v1", { ...previews, [source.animeId]: { ...record, everCompleted, episodeKey: source.key, updatedAt: Date.now() } });
       if (!library[source.animeId] || library[source.animeId] === "Plan to Watch") {
         library[source.animeId] = "Watching";
         write("library", library);
@@ -777,6 +790,7 @@ function videoMessage(text, action = "") {
   target.classList.remove("hidden");
 }
 async function mountPlayer({ autoplay = false, atTime = null } = {}) {
+  const offline = currentRoute().params.get("offline") === "1";
   const selected = currentEpisode();
   if (!selected?.episode) return;
   const { anime: a, season, episode } = selected, key = episodeKey(a.id, season.id, episode.number), old = $("#video");
@@ -865,7 +879,7 @@ async function mountPlayer({ autoplay = false, atTime = null } = {}) {
   });
   listen("error", () => {
     if (player !== video) return;
-    if (!fallbackUsed && !activeSource?.preview) {
+    if (!offline && !fallbackUsed && !activeSource?.preview) {
       fallbackUsed = true;
       const fallback = previewSource(key);
       if (fallback) {
@@ -883,21 +897,32 @@ async function mountPlayer({ autoplay = false, atTime = null } = {}) {
     save(true);
     updatePlayerPanel();
     const next = nextEpisode(a, season.id, episode.number);
-    if (next && prefs.autoNext && (sourceFor(episodeKey(a.id, next.seasonId, next.number)) || cachedIds.includes(episodeKey(a.id, next.seasonId, next.number)))) go(episodeLink(a, next).slice(1) + "&autoplay=1");
-    else videoMessage(next ? "Episode finished. Ready for the next one?" : "You’ve reached the final episode.", next ? `<a class="btn primary" href="${episodeLink(a, next)}">Next Episode</a>` : `<a class="btn primary" href="#detail/${a.id}">Back to Series</a>`);
+    const nextKey = next && episodeKey(a.id, next.seasonId, next.number);
+    if (next && prefs.autoNext && (cachedIds.includes(nextKey) || !offline && sourceFor(nextKey))) {
+      go(episodeLink(a, next).slice(1) + "&autoplay=1" + (offline ? "&offline=1" : ""));
+      return;
+    }
+    videoMessage(next ? "Episode finished. Ready for the next one?" : "You’ve reached the final episode.", next ? `<a class="btn primary" href="${episodeLink(a, next)}">Next Episode</a>` : `<a class="btn primary" href="#detail/${a.id}">Back to Series</a>`);
   });
-  let file = runtimeSources.has(key) ? null : await localVideo(key);
+  const file = offline || !runtimeSources.has(key) ? await localVideo(key) : null;
   if (player !== video) return;
-  let source = sourceFor(key);
-  if (!file && !selectSource(sources[key]) && !runtimeSources.has(key)) source = selectSource(await fetchEpisodeSource(key, source));
+  if (offline && !file) {
+    playerContext.loading = false;
+    videoMessage("This offline video is missing from this device.", '<a class="btn secondary" href="#watchlist?tab=Downloaded">Back to Downloads</a>');
+    return;
+  }
+  let source = file ? sourceFor(key) : await resolveEpisodeSource(key);
   if (player !== video) return;
-  if (file && source?.preview && !sources[key]?.local) file = null;
-  if (file && sources[key]?.local) source = { demo: false, audio: "original", subtitles: [] };
+  if (file && (offline || !source || source.preview)) source = { audio: source?.preview ? "original" : source?.audio, subtitles: [] };
   if (!file && isYouTubeSource(source)) {
     showTitlePreview(source, { autoplay });
     return;
   }
   activeSource = source;
+  if (!file && canSaveSource(source) && !source.demo) {
+    // Save the same source that actually started playing.
+    video.addEventListener("playing", () => downloadVideo(key, { automatic: true, playingSource: source }), { once: true, signal: controller.signal });
+  }
   showVideoSource(source);
   if (file) {
     const url = URL.createObjectURL(file);
@@ -975,12 +1000,12 @@ async function playVideo() {
     toast("Video ready. Tap Play again or choose another video source.");
   }
 }
-function videoSourceSheet(key = mediaKey()) {
+function videoSourceSheet(key = mediaKey(), { download = false } = {}) {
   const selected = episodeFromKey(key);
   if (!selected) return;
   pendingSourceKey = key;
   const source = sourceFor(key);
-  openSheet(`Video Source · Episode ${selected.episode.number}`, `<p>${esc(selected.anime.short)} · ${esc(selected.season.name)}<br>Each episode has its own video source.</p><form id="video-source-form" class="stack" data-key="${key}"><label class="field">Video file<input type="file" name="file" accept="video/*"></label><p class="micro muted">The selected file stays on this device and works offline.</p><label class="field">Or a direct video URL<input type="url" name="url" placeholder="https://your-cdn.example/episode.mp4" value="${esc(source?.demo || source?.preview ? "" : source?.url || "")}"></label><label class="field">Optional subtitles (.vtt)<input type="file" name="subtitle" accept=".vtt,text/vtt"></label><label class="field">Subtitle language<select name="subtitleLanguage"><option value="en">English</option><option value="tl">Tagalog</option><option value="ja">Japanese</option></select></label><p id="source-error" class="form-error" role="alert"></p><button class="btn primary" type="submit">Save &amp; Play</button><button class="text-button" type="button" data-action="remove-source" data-key="${key}">Use Default Sample</button></form>`);
+  openSheet(`${download ? "Download" : "Video Source"} · Episode ${selected.episode.number}`, `<p>${esc(selected.anime.short)} · ${esc(selected.season.name)}<br>${download ? "Save a video you have permission to use. Embedded previews stream online." : "Each episode has its own video source."}</p><form id="video-source-form" class="stack" data-key="${key}" data-download="${download}"><label class="field">Video file<input type="file" name="file" accept="video/*"></label><p class="micro muted">The selected file stays on this device and works offline.</p><label class="field">Or a direct video URL<input type="url" name="url" placeholder="https://your-cdn.example/episode.mp4" value="${esc(source?.demo || source?.preview ? "" : source?.url || "")}"></label><label class="field">Optional subtitles (.vtt)<input type="file" name="subtitle" accept=".vtt,text/vtt"></label><label class="field">Subtitle language<select name="subtitleLanguage"><option value="en">English</option><option value="tl">Tagalog</option><option value="ja">Japanese</option></select></label><p id="source-error" class="form-error" role="alert"></p><button class="btn primary" type="submit">${download ? "Save Offline" : "Save &amp; Play"}</button>${download ? "" : `<button class="text-button" type="button" data-action="remove-source" data-key="${key}">Use Default Sample</button>`}</form>`);
 }
 function sourceList(id) {
   const a = byId(id);
@@ -998,61 +1023,82 @@ async function updateStorage() {
     if ($("#storage-used")) $("#storage-used").textContent = `${cachedIds.length} local episodes`;
   }
 }
-async function downloadVideo(key, { batch = false } = {}) {
-  const owner = accountOwner;
-  const selected = episodeFromKey(key);
-  if (!selected) return false;
-  if (sourceFor(key)?.preview && !sources[key]?.local) {
-    openSheet("Preview Streaming", '<p>Official trailers stream through YouTube. To save an episode offline, add your own video file or a direct downloadable video source.</p><button class="btn secondary" data-action="open-source" data-key="' + key + '">Add Your Video</button>');
-    return false;
-  }
-  if (downloadKeys.has(key)) {
-    if (!batch) toast("This episode is already downloading.");
-    return false;
-  }
-  const local = await localVideo(key);
-  if (local) {
-    if (!batch) {
-      const url = URL.createObjectURL(local), link = document.createElement("a");
-      link.href = url;
-      link.download = `AniVerse-${selected.anime.id}-S${selected.season.number}-E${selected.episode.number}.${local.type.includes("webm") ? "webm" : "mp4"}`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1e3);
-    }
-    return true;
-  }
-  const source = sourceFor(key);
-  if (!source) {
-    if (!batch) videoSourceSheet(key);
-    return false;
-  }
+function showSavedDownload() {
+  openSheet("Ready to Watch Offline", '<p>This episode is saved on this device.</p><a class="btn primary" href="#watchlist?tab=Downloaded">View Downloads</a>');
+}
+function recordDownload(selected) {
+  const link = episodeLink(selected.anime, { ...selected.episode, seasonId: selected.season.id }).slice(1);
+  recordEvent("Episode ready offline", `${selected.anime.short} · Episode ${selected.episode.number}`, "Downloads", link + "&offline=1");
+}
+async function fetchDownload(url) {
   if (prefs.wifi && navigator.connection?.type === "cellular") {
-    if (!batch) toast("Wi-Fi downloads are enabled. Connect to Wi-Fi or change Offline Preferences.");
+    throw new Error("Wi-Fi downloads are enabled. Connect to Wi-Fi or change Offline Preferences.");
+  }
+  let response;
+  try {
+    response = await fetch(new URL(url, location.href));
+  } catch {
+    throw new Error("Could not reach the video file. Check your connection and make sure the host allows cross-origin downloads.");
+  }
+  if (!response.ok) throw new Error(`Video download failed (${response.status}).`);
+  const type = (response.headers.get("content-type") || "").split(";")[0].toLowerCase();
+  const fileURL = new URL(response.url || url, location.href);
+  if (!type.startsWith("video/") && !(["", "application/octet-stream"].includes(type) && /\.(mp4|m4v|webm|mov)$/i.test(fileURL.pathname))) {
+    throw new Error("Enter a direct MP4, WebM, M4V, or MOV file URL.");
+  }
+  const file = await response.blob();
+  if (!file.size) throw new Error("The video file is empty.");
+  return file;
+}
+function refreshDownloadButton(key) {
+  if (currentRoute().page !== "player" || mediaKey() !== key) return;
+  const button = $('.player-actions [data-action="download"]');
+  if (button) button.innerHTML = `${icon("29e94.svg")}${cachedIds.includes(key) ? "Downloaded" : "Download"}`;
+}
+async function downloadVideo(key, { batch = false, automatic = false, playingSource } = {}) {
+  const owner = accountOwner, operation = `${owner}|${key}`, selected = episodeFromKey(key);
+  if (!selected) return false;
+  const interactive = !batch && !automatic;
+  if (downloadKeys.has(operation)) {
+    if (interactive) toast("This episode is already downloading.");
     return false;
   }
-  downloadKeys.add(key);
-  if (!batch) toast("Downloading episode. Keep this tab open.");
+  downloadKeys.add(operation);
   try {
-    const response = await fetch(new URL(source.url, location.href));
-    if (!response.ok) throw new Error(`Video download failed (${response.status}).`);
-    const type = response.headers.get("content-type") || "";
-    if (type.includes("text/") || type.includes("json")) throw new Error("Use a direct video file URL, not a webpage.");
-    const file = await response.blob();
-    if (!file.size) throw new Error("The video file is empty.");
+    const local = await localVideo(key);
     if (owner !== accountOwner) return false;
-    await saveVideo(key, file);
-    recordEvent("Episode ready offline", `${selected.anime.short} · Episode ${selected.episode.number}`, "Downloads", episodeLink(selected.anime, { ...selected.episode, seasonId: selected.season.id }).slice(1));
-    if (!batch) toast("Episode saved for offline viewing.");
+    if (local) {
+      indexDownload(key, owner);
+      refreshDownloadButton(key);
+      if (interactive) showSavedDownload();
+      return true;
+    }
+    const source = playingSource || await resolveEpisodeSource(key);
+    if (owner !== accountOwner) return false;
+    if (!canSaveSource(source)) {
+      if (interactive) videoSourceSheet(key, { download: true });
+      return false;
+    }
+    if (interactive) toast("Downloading episode. Keep this tab open.");
+    const file = await fetchDownload(source.url);
+    if (owner !== accountOwner || !await saveVideo(key, file)) return false;
+    recordDownload(selected);
+    refreshDownloadButton(key);
+    const page = currentRoute().page;
+    if (interactive && page === "player" && mediaKey() === key) showSavedDownload();
+    if (automatic) toast("Episode saved to My Library → Downloaded.");
+    if (!batch && page === "watchlist") render({ keepScroll: true });
     return true;
   } catch (error) {
-    if (!batch) openSheet("Download Unavailable", `<p>${esc(error.message)} Your video host must allow cross-origin downloads. You can save a video file manually instead.</p><button class="btn primary" data-action="open-source" data-key="${key}">Choose a Video File</button>`);
+    if (automatic && owner === accountOwner) toast("Offline save didn’t finish. Use Download to try again.");
+    if (interactive && owner === accountOwner) openSheet("Download Unavailable", `<p>${esc(error.message)}</p><button class="btn primary" data-action="download-source" data-key="${key}">Choose Video Source</button>`);
     return false;
   } finally {
-    downloadKeys.delete(key);
+    downloadKeys.delete(operation);
   }
 }
 async function downloadAll(id) {
-  const a = byId(id), keys = orderedEpisodes(a).map((episode) => episodeKey(id, episode.seasonId, episode.number)).filter((key) => !sourceFor(key)?.preview && (sourceFor(key) || cachedIds.includes(key)));
+  const a = byId(id), keys = orderedEpisodes(a).map((episode) => episodeKey(id, episode.seasonId, episode.number)).filter((key) => cachedIds.includes(key) || canSaveSource(sourceFor(key)) || localEpisodePath(key));
   if (!keys.length) return sourceList(id);
   toast(`Preparing ${keys.length} available episodes…`);
   let count = 0;
@@ -1100,7 +1146,8 @@ async function removeLocalVideo(key) {
   await deleteStored("videos", key);
   if (owner !== accountOwner) return;
   const selected = episodeFromKey(key);
-  if (selected && key === legacyKeyFor(selected.anime)) await deleteStored("videos", selected.anime.id);
+  if (selected && key === legacyKeyFor(selected.anime)) await deleteStored("videos", selected.anime.id, owner);
+  if (owner !== accountOwner) return;
   cachedIds = cachedIds.filter((item) => item !== key);
   write("cached-episode-keys-v2", cachedIds);
 }
@@ -1372,6 +1419,7 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "source-list") return sourceList(id);
     if (action === "open-source") return videoSourceSheet(key);
+    if (action === "download-source") return videoSourceSheet(key, { download: true });
     if (action === "remove-source") {
       openSheet("Use Official Title Preview?", `<p>Remove the personal video, subtitles, and URL for this episode on this device, then use this anime’s official title preview?</p><button class="btn primary" data-action="confirm-remove-source" data-key="${key}">Use Title Preview</button><button class="btn secondary" data-action="open-source" data-key="${key}">Cancel</button>`);
       return;
@@ -1680,26 +1728,35 @@ document.addEventListener("submit", async (event) => {
     return;
   }
   if (form.id === "video-source-form") {
-    const owner = accountOwner, key = form.dataset.key, file = data.get("file"), url = String(data.get("url")).trim(), subtitle = data.get("subtitle"), button = $('button[type="submit"]', form);
+    const owner = accountOwner, key = form.dataset.key, operation = `${owner}|${key}`, download = form.dataset.download === "true";
+    const file = data.get("file"), url = String(data.get("url")).trim(), subtitle = data.get("subtitle"), button = $('button[type="submit"]', form);
+    if (downloadKeys.has(operation)) return toast("A save for this episode is already in progress.");
+    downloadKeys.add(operation);
     button.disabled = true;
     button.textContent = "Saving…";
     try {
       if (!episodeFromKey(key)) throw new Error("This episode is not in the catalog.");
+      if (download && !file?.size && !url) throw new Error("Choose a video file or enter its direct URL.");
       if (!file?.size && !url && !subtitle?.size) throw new Error("Choose a video file, enter a video URL, or add subtitles.");
       if (subtitle?.size) {
         if (subtitle.size > 5 * 1024 * 1024) throw new Error("Subtitle files must be smaller than 5 MB.");
         const text = (await subtitle.text()).replace(/^\uFEFF/, "");
         if (!/^WEBVTT(?:\s|$)/.test(text)) throw new Error("Choose a valid WebVTT (.vtt) subtitle file.");
       }
+      if (owner !== accountOwner) return;
       if (file?.size) {
         if (!file.type.startsWith("video/") && !/\.(mp4|webm|m4v|mov)$/i.test(file.name)) throw new Error("Choose a compatible video file.");
-        await saveVideo(key, file);
-        if (owner !== accountOwner) return;
+        if (!await saveVideo(key, file)) return;
         sources[key] = { local: true };
         write("video-sources-v2", sources);
       } else if (url) {
         if (!safeMediaURL(url) || /^\.\.?\//.test(url) || url.startsWith("/")) throw new Error("Enter an HTTPS direct video URL (or localhost while developing).");
-        if (url !== sourceFor(key)?.url) {
+        if (download) {
+          const video = await fetchDownload(url);
+          if (owner !== accountOwner || !await saveVideo(key, video)) return;
+          sources[key] = { url, quality: "Original", audio: "ja" };
+          write("video-sources-v2", sources);
+        } else if (url !== sourceFor(key)?.url) {
           await removeLocalVideo(key);
           if (owner !== accountOwner) return;
           sources[key] = { url, quality: "Original", audio: "ja" };
@@ -1707,8 +1764,16 @@ document.addEventListener("submit", async (event) => {
         }
       }
       if (subtitle?.size) await putStored("tracks", key, { file: subtitle, language: String(data.get("subtitleLanguage")), label: { en: "English", tl: "Tagalog", ja: "Japanese" }[data.get("subtitleLanguage")] || "Subtitles" });
+      if (owner !== accountOwner) return;
       runtimeSources.delete(key);
       const item = episodeFromKey(key);
+      if (download) {
+        refreshDownloadButton(key);
+        recordDownload(item);
+        if (form.isConnected) showSavedDownload();
+        else toast("Episode saved for offline viewing.");
+        return;
+      }
       recordEvent("Episode source updated", `${item.anime.short} · Episode ${item.episode.number}`, "System", episodeLink(item.anime, { ...item.episode, seasonId: item.season.id }).slice(1));
       closeSheet();
       if (currentRoute().page === "player" && mediaKey() === key) {
@@ -1716,9 +1781,13 @@ document.addEventListener("submit", async (event) => {
         await mountPlayer({ autoplay: true });
       } else go(episodeLink(item.anime, { ...item.episode, seasonId: item.season.id }).slice(1) + "&autoplay=1");
     } catch (error) {
-      $("#source-error").textContent = error.message || "The video could not be saved. Check available storage.";
-      button.disabled = false;
-      button.textContent = "Save & Play";
+      if (form.isConnected) {
+        $("#source-error", form).textContent = error.name === "QuotaExceededError" ? "Device storage is full. Free some space and try again." : error.message || "The video could not be saved.";
+        button.disabled = false;
+        button.textContent = download ? "Save Offline" : "Save & Play";
+      }
+    } finally {
+      downloadKeys.delete(operation);
     }
   }
 });
@@ -1849,8 +1918,12 @@ async function syncCloud(notify = false) {
   }
 }
 async function handleAuthChange(event, session) {
-  const next = session?.user || null, nextOwner = next?.id || "guest";
-  if (accountOwner !== nextOwner) {
+  const next = session?.user || null;
+  // An expired session can still open this browser’s local files while offline.
+  const offlineOwner = auth.configured && !navigator.onLine && event === "INITIAL_SESSION" ? read("offline-account-owner", "") : "";
+  const nextOwner = next?.id || offlineOwner || "guest";
+  if (next || event === "SIGNED_OUT" || navigator.onLine) write("offline-account-owner", next?.id || "");
+  if (accountOwner !== nextOwner || Boolean(authUser) !== Boolean(next)) {
     stopPlayer();
     clearTimeout(syncTimer);
     accountOwner = nextOwner;
@@ -1903,7 +1976,8 @@ async function bootAuth() {
     }
   } catch (error) {
     authLoading = false;
-    toast(friendlyAuthError(error));
+    if (!navigator.onLine) await handleAuthChange("INITIAL_SESSION", null);
+    else toast(friendlyAuthError(error));
   }
   const page = currentRoute().page;
   if (["login", "signup", "forgot-password", "reset-password"].includes(page) || (isMembershipRoute(page) && !canAccessMembership())) {
