@@ -2,6 +2,7 @@ import { mountScreen, mountDialog } from "./vendor/react-ui.js";
 import { supabaseConfig } from "./config.js?v=2.7.0";
 import { createAuthService, friendlyAuthError } from "./modules/auth.js";
 import { authPage } from "./modules/auth-ui.js";
+import { readAuthCallback, cleanAuthCallback } from "./modules/auth-callback.js";
 import { accountStorageKey, defaultPreferences, mergeAccountState, pullAccount, pushAccount } from "./modules/account-store.js";
 import { catalog } from "./content/catalog.js";
 import { fetchEpisodeSource, fetchLocalEpisodeSource, localEpisodePath } from "./modules/video-client.js";
@@ -50,13 +51,15 @@ const write = (key, value) => {
 };
 const auth = createAuthService(supabaseConfig, { onChange: handleAuthChange });
 const authCallbackURL = new URL(location.href);
-const recoveryCallback = authCallbackURL.searchParams.get("auth") === "recovery";
+const authCallback = readAuthCallback(authCallbackURL);
+const recoveryCallback = authCallback.recovery;
+let recoveryMessage = "";
 const anime = catalog;
 const byId = (id) => anime.find((item) => item.id === id);
 const genres = [...new Set(anime.flatMap((item) => item.tags))].sort();
 const studios = [...new Set(anime.map((item) => item.studio))].sort();
 const app = $("#app"), sheet = $("#sheet");
-const currentRoute = () => parseRoute(location.hash);
+const currentRoute = () => parseRoute(authLoading && authCallback.hasAuthHash ? recoveryCallback ? "#reset-password" : "#login" : location.hash);
 const defaultFilter = () => ({ genre: "All Catalog", rating: 0, studio: "All", dub: false, sort: "rating", view: "grid" });
 let library = read("library", {});
 library = Object.fromEntries(Object.entries(library).filter(([id, status]) => byId(id) && ["Watching", "Plan to Watch", "Completed"].includes(status)));
@@ -559,7 +562,7 @@ function render(options = {}) {
   const page = requiresLogin ? "login" : route.page;
   const a = byId(id), selected = seasonFor(a, seasonId);
   const invalidSeries = ["detail", "player"].includes(page) && (currentRoute().invalidEpisode || !a || seasonId && !a.seasons.some((item) => item.id === seasonId) || page === "player" && !episodeFor(a, selected?.id, episode ?? selected?.episodes[0]?.number));
-  const views = { login: () => authPage({ configured: auth.configured, loading: authLoading }), signup: () => authPage({ mode: "signup", configured: auth.configured, loading: authLoading }), "forgot-password": () => authPage({ mode: "forgot", configured: auth.configured, loading: authLoading, email: authUser?.email || "" }), "reset-password": () => authPage({ mode: "reset", configured: auth.configured, loading: authLoading, recovery: auth.recovery }), "verify-email": () => authPage({ mode: "verify", configured: auth.configured }), home, browse, search, watchlist: libraryView, profile: profilePage, notifications: notificationsPage, checkout, confirmation, detail: () => detail(id), player: () => playerPage(id) };
+  const views = { login: () => authPage({ configured: auth.configured, loading: authLoading }), signup: () => authPage({ mode: "signup", configured: auth.configured, loading: authLoading }), "forgot-password": () => authPage({ mode: "forgot", configured: auth.configured, loading: authLoading, email: authUser?.email || "" }), "reset-password": () => authPage({ mode: "reset", configured: auth.configured, loading: authLoading, recovery: auth.recovery, message: recoveryMessage }), "verify-email": () => authPage({ mode: "verify", configured: auth.configured }), home, browse, search, watchlist: libraryView, profile: profilePage, notifications: notificationsPage, checkout, confirmation, detail: () => detail(id), player: () => playerPage(id) };
   rowScrollObserver.disconnect();
   mountScreen(app, invalidSeries || !views[page] ? notFound() : views[page](), !navigator.onLine);
   addRowScrollbars();
@@ -1961,32 +1964,21 @@ async function handleAuthChange(event, session) {
 }
 async function bootAuth() {
   try {
-    const recoveryCode = recoveryCallback ? authCallbackURL.searchParams.get("code") : null;
-    const session = await auth.init({ recoveryCode });
+    if (authCallback.error) throw new Error("This account link has expired or could not be verified. Request a new link.");
+    const session = await auth.init({ recoveryCode: authCallback.code, recoveryTokenHash: authCallback.tokenHash, implicitCallback: authCallback.hasAuthHash });
+    // Keep fragment credentials intact until the SDK has consumed them.
+    if (authCallback.present) history.replaceState(history.state, "", cleanAuthCallback(location.href, authCallback, auth.recovery));
     authLoading = false;
     await handleAuthChange("INITIAL_SESSION", session);
-    const url = new URL(location.href);
-    if (!recoveryCallback && (url.searchParams.has("auth") || url.searchParams.has("code"))) {
-      const error = url.searchParams.get("error_description");
-      url.searchParams.delete("code");
-      url.searchParams.delete("auth");
-      url.searchParams.delete("error");
-      url.searchParams.delete("error_description");
-      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
-      if (error) toast("This account link could not be verified. Request a new link.");
-      else if (auth.recovery) go("reset-password");
-      else if (session && !location.hash) go("profile");
-    }
+    if (auth.recovery) go("reset-password");
+    else if (session && authCallback.present && !recoveryCallback && !location.hash) go("profile");
   } catch (error) {
     authLoading = false;
+    if (recoveryCallback) recoveryMessage = friendlyAuthError(error);
     if (!navigator.onLine) await handleAuthChange("INITIAL_SESSION", null);
     else if (!recoveryCallback) toast(friendlyAuthError(error));
   } finally {
-    if (recoveryCallback) {
-      const url = new URL(location.href);
-      for (const key of ["auth", "code", "sb_flow_id", "error", "error_code", "error_description"]) url.searchParams.delete(key);
-      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
-    }
+    if (authCallback.present) history.replaceState(history.state, "", cleanAuthCallback(location.href, authCallback, auth.recovery));
   }
   const page = currentRoute().page;
   if (["login", "signup", "forgot-password", "reset-password"].includes(page) || (isMembershipRoute(page) && !canAccessMembership())) {
@@ -2002,7 +1994,7 @@ async function submitAuthForm(form, data) {
   try {
     const result = await auth.submit(mode, Object.fromEntries(data));
     if (mode === "forgot") {
-      message.textContent = "If an account exists for this email, you’ll receive a reset link shortly. Open it in this browser to continue.";
+      message.textContent = "If an account exists for this email, you’ll receive a reset link shortly. Open the latest email to choose a new password.";
       return;
     }
     if (mode === "reset") {
@@ -2021,12 +2013,12 @@ async function submitAuthForm(form, data) {
   } catch (problem) {
     error.textContent = friendlyAuthError(problem);
   } finally {
-    button.disabled = !auth.configured;
+    button.disabled = !auth.configured || mode === "reset" && !auth.recovery;
     button.textContent = original;
   }
 }
 if (!Number.isInteger(history.state?.aniverseDepth)) history.replaceState({ aniverseDepth: 0 }, "", location.href);
-if (recoveryCallback) history.replaceState(history.state, "", location.pathname + location.search + "#reset-password");
+if (recoveryCallback && !authCallback.hasAuthHash) history.replaceState(history.state, "", location.pathname + location.search + "#reset-password");
 let lastRoute = currentRoute();
 window.addEventListener("hashchange", () => {
   if (sheet.open) closeSheet();

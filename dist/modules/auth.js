@@ -23,6 +23,7 @@ export function friendlyAuthError(error) {
   if (/rate|too many|429/i.test(code + " " + message)) return "Too many requests. Please wait a little and try again.";
   if (/fetch|network|timeout/i.test(message)) return "We could not connect. Check your internet connection and try again.";
   if (code === "weak_password") return "Choose a stronger password with at least 8 characters.";
+  if (code === "otp_expired" || /expired|invalid.*token|token.*invalid/i.test(message)) return "This reset link has expired or was already used. Request a new reset link.";
   return message.slice(0, 200) || "Something went wrong. Please try again.";
 }
 export function createAuthService(config, { loadSDK = () => import("../vendor/supabase.js"), onChange = () => {
@@ -48,15 +49,27 @@ export function createAuthService(config, { loadSDK = () => import("../vendor/su
     get recovery() {
       return recovery;
     },
-    async init({ recoveryCode = null } = {}) {
+    async init({ recoveryCode = null, recoveryTokenHash = null, implicitCallback = false } = {}) {
       if (!ready) return null;
       const { createClient } = await loadSDK();
-      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !recoveryCode, flowType: "pkce" } });
+      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !(recoveryCode || recoveryTokenHash), flowType: implicitCallback ? "implicit" : "pkce" } });
       client.auth.onAuthStateChange((event, session) => {
         if (event === "PASSWORD_RECOVERY" && session?.user) recovery = true;
         if (event === "SIGNED_OUT") recovery = false;
         setTimeout(() => onChange(event, session), 0);
       });
+      if (recoveryTokenHash) {
+        // A one-time recovery token can be verified on another browser/device.
+        // Never enable password updates based on URL flags or a saved session.
+        const { data, error } = await client.auth.verifyOtp({ token_hash: recoveryTokenHash, type: "recovery" });
+        if (error) {
+          recovery = false;
+          throw error;
+        }
+        recovery = Boolean(data?.session?.user);
+        if (!recovery) throw new Error("This reset link could not be verified. Request a new reset link.");
+        return data.session;
+      }
       if (recoveryCode) {
         // Exchange exactly once and wait for Supabase to confirm the recovery flow.
         const { data, error } = await client.auth.exchangeCodeForSession(recoveryCode);
@@ -64,6 +77,8 @@ export function createAuthService(config, { loadSDK = () => import("../vendor/su
         recovery = data?.redirectType === "recovery" && Boolean(data.session?.user);
         return data?.session ?? null;
       }
+      const initialized = await client.auth.initialize?.();
+      if (initialized?.error) throw initialized.error;
       const { data, error } = await client.auth.getSession();
       if (error) throw error;
       return data.session;

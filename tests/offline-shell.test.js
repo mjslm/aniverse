@@ -19,7 +19,7 @@ test('production offline installation includes the exact versioned startup impor
   const entry = read('index.html').match(/type="module" src="([^"]+)"/)[1];
   const app = read('bootstrap.js').match(/import\('([^']+)'\)/)[1];
   const config = read('app.js').match(/from "(\.\/config\.js[^\"]*)"/)[1];
-  for (const file of [entry, app, config, './modules/local-preview.js', './tailwind.css', './vendor/react-ui.js']) assert(cached.includes(file), file);
+  for (const file of [entry, app, config, './modules/local-preview.js', './modules/auth-callback.js', './tailwind.css', './vendor/react-ui.js']) assert(cached.includes(file), file);
   assert.equal(typeof events.fetch, 'function');
 });
 
