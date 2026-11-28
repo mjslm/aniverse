@@ -72,9 +72,36 @@ In Supabase **Authentication → URL Configuration**, set **Site URL** to your d
 ```text
 http://localhost:3000/?auth=confirmed
 http://localhost:3000/?auth=recovery
-https://aniverse-slmn.vercel.app/?auth=confirmed
-https://aniverse-slmn.vercel.app/?auth=recovery
+https://aniverse-slmn-v2.vercel.app/?auth=confirmed
+https://aniverse-slmn-v2.vercel.app/?auth=recovery
 ```
+
+### Password recovery on mobile and desktop
+
+Supabase sends the recovery email; AniVerse displays the **New password** and **Confirm password** form and updates the password after verification.
+
+For the current production site, set **Site URL** to `https://aniverse-slmn-v2.vercel.app`. Add the two exact production callback URLs above to **Redirect URLs**. Keep local or older-domain redirects only if you still use them.
+
+To let someone request a reset on desktop and open the email on mobile (or another browser), deploy this version first, then update **Authentication → Email Templates → Reset Password** to use:
+
+```html
+<h2>Reset your AniVerse password</h2>
+<p>Open the link below to choose a new password.</p>
+<p><a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=recovery">Reset password</a></p>
+<p>If you did not request this, you can ignore this email.</p>
+```
+
+This template is specific to AniVerse's reset request, whose redirect always includes `?auth=recovery`. Supabase may also append `sb_flow_id`. The app verifies the one-time token with `verifyOtp({ token_hash, type: "recovery" })`, then removes callback credentials from the address. It enables password updates only after Supabase verifies recovery. Ordinary sign-in/sign-up requests continue to use PKCE. [Supabase email template guide](https://supabase.com/docs/guides/auth/auth-email-templates)
+
+The default `{{ .ConfirmationURL }}` template and previously sent PKCE reset links still need the original browser's verifier. Request a **new** reset email after changing the template. The template and redirect settings are stored in Supabase, so merging code alone does not update them.
+
+Check the complete flow after deployment:
+
+1. Request a reset from **Log In → Forgot password** on desktop.
+2. Open the newest email on a phone in another browser. Confirm the new-password form appears and permits submission after verification.
+3. Enter matching passwords of at least 8 characters, submit, then check a fresh login with the new password.
+4. Repeat with a request from mobile and an email opened on desktop.
+5. A used/expired link must offer a new link and keep **Update Password** disabled. Follow **Send a new reset link** and confirm a replacement can be requested without reloading the app. Visiting `/#reset-password` without a valid recovery link must not enable password updates.
 
 Import the repository into Vercel and use these settings:
 

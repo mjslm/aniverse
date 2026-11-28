@@ -45,7 +45,7 @@ for (const asset of new Set(code.match(/[\w-]+\.(?:png|svg|ttf|jpe?g|webp|avif)/
   const file = path.join(root, "dist/assets", asset);
   if (!fs.existsSync(file) || !fs.statSync(file).size) errors.push(`Missing asset: ${asset}`);
 }
-for (const file of ["dist/config.js", "dist/bootstrap.js", "dist/modules/local-preview.js", "scripts/config.mjs", "dist/modules/auth.js", "dist/modules/auth-ui.js", "dist/modules/account-store.js", "dist/app.js", "dist/modules/catalog.js", "dist/content/catalog.js", "dist/content/media.js", "dist/content/previews.js", "dist/modules/preview-source.js", "dist/modules/youtube-player.js", "dist/modules/motion.js", "dist/modules/search-suggestions.js", "dist/modules/profile-photo.js", "dist/modules/video-api.js", "dist/modules/video-client.js", "api/videos.js", "api/health.js", "dist/sw.js"]) {
+for (const file of ["dist/config.js", "dist/bootstrap.js", "dist/modules/local-preview.js", "scripts/config.mjs", "dist/modules/auth.js", "dist/modules/auth-ui.js", "dist/modules/auth-callback.js", "dist/modules/account-store.js", "dist/app.js", "dist/modules/catalog.js", "dist/content/catalog.js", "dist/content/media.js", "dist/content/previews.js", "dist/modules/preview-source.js", "dist/modules/youtube-player.js", "dist/modules/motion.js", "dist/modules/search-suggestions.js", "dist/modules/profile-photo.js", "dist/modules/video-api.js", "dist/modules/video-client.js", "api/videos.js", "api/health.js", "dist/sw.js"]) {
   const result = spawnSync(process.execPath, ["--check", path.join(root, file)], { encoding: "utf8" });
   if (result.status !== 0) errors.push(result.stderr);
 }
