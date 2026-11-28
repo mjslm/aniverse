@@ -60,7 +60,10 @@ test("PKCE recovery still opens the reset form if a redirect omits the auth mark
 });
 
 test("expired callbacks show recovery feedback and never fall back to a saved session", async () => {
-  const result = await boot("https://aniverse.example/?auth=recovery#error=access_denied&error_code=otp_expired", () => assert.fail("An error callback must not restore a saved account."));
+  const result = await boot("https://aniverse.example/?auth=recovery#error=access_denied&error_code=otp_expired", options => {
+    assert.equal(options.callbackError, "otp_expired");
+    throw new Error("This account link has expired or could not be verified. Request a new link.");
+  });
   assert.match(result.context.recoveryMessage, /expired/);
   assert.equal(result.context.auth.recovery, false);
   assert.equal(result.url.href, "https://aniverse.example/#reset-password");
@@ -68,6 +71,24 @@ test("expired callbacks show recovery feedback and never fall back to a saved se
   assert.match(failed.context.recoveryMessage, /already used/);
   assert.equal(failed.url.search, "");
   assert.equal(failed.context.auth.recovery, false);
+});
+
+test("an expired callback still initializes account services to request a replacement email", async () => {
+  const sent = [];
+  const fake = { auth: {
+    onAuthStateChange() {},
+    getSession() { assert.fail("An expired callback must not be treated as a saved recovery session."); },
+    async resetPasswordForEmail(email, options) { sent.push({ email, ...options }); return { data: {}, error: null }; },
+  } };
+  const auth = createAuthService(config, { baseURL: () => "https://aniverse.example/", loadSDK: async () => ({ createClient(_url, _key, options) {
+    assert.equal(options.auth.detectSessionInUrl, false);
+    return fake;
+  } }) });
+  await assert.rejects(auth.init({ callbackError: "otp_expired", implicitCallback: true }), /expired/);
+  assert.equal(auth.recovery, false);
+  assert.equal(auth.client, fake);
+  await auth.submit("forgot", { email: "fan@example.test" });
+  assert.deepEqual(sent, [{ email: "fan@example.test", redirectTo: "https://aniverse.example/?auth=recovery" }]);
 });
 
 test("normal hash routes remain intact and non-recovery token types cannot activate recovery", () => {

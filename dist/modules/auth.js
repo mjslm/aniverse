@@ -49,15 +49,17 @@ export function createAuthService(config, { loadSDK = () => import("../vendor/su
     get recovery() {
       return recovery;
     },
-    async init({ recoveryCode = null, recoveryTokenHash = null, implicitCallback = false } = {}) {
+    async init({ recoveryCode = null, recoveryTokenHash = null, implicitCallback = false, callbackError = null } = {}) {
       if (!ready) return null;
       const { createClient } = await loadSDK();
-      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !(recoveryCode || recoveryTokenHash), flowType: implicitCallback ? "implicit" : "pkce" } });
+      client = createClient(config.url, config.publishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !(recoveryCode || recoveryTokenHash || callbackError), flowType: implicitCallback && !callbackError ? "implicit" : "pkce" } });
       client.auth.onAuthStateChange((event, session) => {
         if (event === "PASSWORD_RECOVERY" && session?.user) recovery = true;
         if (event === "SIGNED_OUT") recovery = false;
         setTimeout(() => onChange(event, session), 0);
       });
+      // Keep the client available so an expired link can request a replacement.
+      if (callbackError) throw new Error("This account link has expired or could not be verified. Request a new link.");
       if (recoveryTokenHash) {
         // A one-time recovery token can be verified on another browser/device.
         // Never enable password updates based on URL flags or a saved session.

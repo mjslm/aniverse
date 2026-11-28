@@ -101,7 +101,7 @@ Check the complete flow after deployment:
 2. Open the newest email on a phone in another browser. Confirm the new-password form appears and permits submission after verification.
 3. Enter matching passwords of at least 8 characters, submit, then check a fresh login with the new password.
 4. Repeat with a request from mobile and an email opened on desktop.
-5. A used/expired link must offer a new link and keep **Update Password** disabled. Visiting `/#reset-password` without a valid recovery link must not enable password updates.
+5. A used/expired link must offer a new link and keep **Update Password** disabled. Follow **Send a new reset link** and confirm a replacement can be requested without reloading the app. Visiting `/#reset-password` without a valid recovery link must not enable password updates.
 
 Import the repository into Vercel and use these settings:
 

@@ -1964,8 +1964,7 @@ async function handleAuthChange(event, session) {
 }
 async function bootAuth() {
   try {
-    if (authCallback.error) throw new Error("This account link has expired or could not be verified. Request a new link.");
-    const session = await auth.init({ recoveryCode: authCallback.code, recoveryTokenHash: authCallback.tokenHash, implicitCallback: authCallback.hasAuthHash });
+    const session = await auth.init({ recoveryCode: authCallback.code, recoveryTokenHash: authCallback.tokenHash, implicitCallback: authCallback.hasAuthHash, callbackError: authCallback.error });
     // Keep fragment credentials intact until the SDK has consumed them.
     if (authCallback.present) history.replaceState(history.state, "", cleanAuthCallback(location.href, authCallback, auth.recovery));
     authLoading = false;
